@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/tebeka/selenium"
 	"log"
 	"multilogin_scraping/utils"
 	"net/http"
 	"time"
+
+	"github.com/tebeka/selenium"
 )
 
 type Profile struct {
@@ -75,8 +76,11 @@ func (ps *Profile) FetchProfile() {
 }
 
 func (ps *Profile) DeleteProfile() {
-	_, err := http.NewRequest(http.MethodDelete, fmt.Sprint(deleteProfileURL, "/", ps.UUID), nil)
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprint(deleteProfileURL, "/", ps.UUID), nil)
 	if err != nil {
+		log.Fatalln(err)
+	}
+	if _, err := http.DefaultClient.Do(req); err != nil {
 		log.Fatalln(err)
 	}
 }
