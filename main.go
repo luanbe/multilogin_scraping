@@ -1,10 +1,13 @@
 package main
 
 import (
-	"multilogin_scraping/crawlers"
+	"github.com/gocolly/colly"
+	"multilogin_scraping/crawlers/zillow"
 )
 
 func main() {
-	zillow := crawlers.NewZillowCrawler()
+	c := colly.NewCollector()
+	cZillow := c.Clone()
+	zillow := zillow.NewZillowCrawler(cZillow)
 	zillow.RunZillowCrawler()
 }
