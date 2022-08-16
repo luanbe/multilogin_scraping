@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"github.com/antchfx/htmlquery"
 	"github.com/gocolly/colly"
+	"github.com/tebeka/selenium"
 	"log"
 	"multilogin_scraping/crawlers"
 	"strings"
-
-	"github.com/tebeka/selenium"
+	"time"
 )
 
 type ZillowCrawler struct {
@@ -46,19 +46,16 @@ func (zc *ZillowCrawler) RunZillowCrawler() {
 		log.Fatalln(err)
 	}
 
-	if err := zc.CheckVerifyHuman(pageSource); err != nil {
-		zc.BaseSel.StopSelenium()
-		log.Fatalln(err)
-	}
+	zc.CheckVerifyHuman(pageSource)
 	zc.CrawlData(zc.CrawlMapBounds(pageSource))
 	//fmt.Println(zc.WebDriver.GetCookies())
 }
 
-func (zc *ZillowCrawler) CheckVerifyHuman(pageSource string) error {
+func (zc *ZillowCrawler) CheckVerifyHuman(pageSource string) {
 	if strings.Contains(pageSource, "Please verify you're a human to continue") {
-		return fmt.Errorf("the website blocked Zillow Crawler")
+		zc.BaseSel.StopSelenium()
+		log.Fatalln("the website blocked Zillow Crawler")
 	}
-	return nil
 }
 
 func (zc *ZillowCrawler) CrawlData(mapBounds MapBounds) {
@@ -171,26 +168,30 @@ func (zc *ZillowCrawler) ExtractData(result SearchPageResResult) {
 		RentZestimate:  result.HdpData.HomeInfo.RentZestimate,
 		Zestimate:      result.HdpData.HomeInfo.Zestimate,
 	}
-	if sd, err := zc.WebDriver.ExecuteScript("window.open('','_blank');", nil); err != nil {
+	if err := zc.WebDriver.Get(zillowData.URL); err != nil {
 		log.Fatalln(err)
 	}
-	if err := sd.Get(zillowData.URL); err != nil {
+	pageSource, err := zc.WebDriver.PageSource()
+	if err != nil {
 		log.Fatalln(err)
 	}
-	if err := zc.WebDriver.Wait(func(wd selenium.WebDriver) (bool, error) {
-		output, err := wd.FindElements(selenium.ByCSSSelector, "div[class=\"data-view-container\"] h4:first-child")
-		if err != nil {
-			return false, err
+	zc.CheckVerifyHuman(pageSource)
+	zc.ParseData(pageSource, zillowData)
+
+	time.Sleep(3 * time.Second)
+}
+
+func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
+	doc, err := htmlquery.Parse(strings.NewReader(source))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// Parse Address
+	if zillowData.Address == "" {
+		addresses := htmlquery.Find(doc, "//h1/text()")
+		for _, v := range addresses {
+			zillowData.Address += v.Data
 		}
-		if len(output) > 0 {
-			return true, nil
-		}
-		return false, nil
-	}); err != nil {
-		log.Fatalln(err)
 	}
-	fmt.Println(zillowData)
-	//if err := zc.WebDriver.SwitchWindow("tab"); err != nil {
-	//	log.Fatalln(err)
-	//}
 }

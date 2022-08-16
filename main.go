@@ -8,6 +8,6 @@ import (
 func main() {
 	c := colly.NewCollector()
 	cZillow := c.Clone()
-	zillow := zillow.NewZillowCrawler(cZillow)
-	zillow.RunZillowCrawler()
+	zillowCrawler := zillow.NewZillowCrawler(cZillow)
+	zillowCrawler.RunZillowCrawler()
 }
