@@ -3,13 +3,15 @@ package zillow
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"multilogin_scraping/crawlers"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/antchfx/htmlquery"
 	"github.com/gocolly/colly"
 	"github.com/tebeka/selenium"
-	"log"
-	"multilogin_scraping/crawlers"
-	"strings"
-	"time"
 )
 
 type ZillowCrawler struct {
@@ -187,11 +189,22 @@ func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
 		log.Fatalln(err)
 	}
 
-	// Parse Address
+	// Address
 	if zillowData.Address == "" {
 		addresses := htmlquery.Find(doc, "//h1/text()")
 		for _, v := range addresses {
 			zillowData.Address += v.Data
+		}
+	}
+	// SF
+	sfs := htmlquery.Find(doc, "//span[@data-testid='bed-bath-item']")
+	for _, v := range sfs {
+		if strings.TrimSpace(htmlquery.FindOne(v, "./span/text()").Data) == "sqft" {
+			sf := strings.TrimSpace(htmlquery.FindOne(v, "/strong/text()").Data)
+			if zillowData.SF, err = strconv.ParseFloat(sf, 64); err != nil {
+				log.Fatalln(err)
+			}
+
 		}
 	}
 }
