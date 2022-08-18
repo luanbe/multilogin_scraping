@@ -216,8 +216,8 @@ type ZillowData struct {
 	HalfBathrooms              float64
 	SF                         float64
 	SalesPrice                 float64
-	EstPayment                 float64
-	PrincipalInterest          float64
+	EstPayment                 string
+	PrincipalInterest          string
 	MortgageInsurance          float64
 	PropertyTaxes              float64
 	HomeInsurance              float64

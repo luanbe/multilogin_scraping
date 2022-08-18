@@ -104,11 +104,11 @@ func (zc *ZillowCrawler) CrawlData(mapBounds MapBounds) {
 	zc.CZillow.OnError(func(r *colly.Response, err error) {
 		log.Fatalln("HTTP Status code:", r.StatusCode, "|URL:", r.Request.URL, "|Errors:", err)
 	})
-	//zc.CZillow.OnRequest(func(r *colly.Request) {
-	//	r.Headers.Set("user-agent")
-	//})
-
-	zc.CZillow.Visit(fmt.Sprintf(searchURL, string(searchPageJson)))
+	zc.CZillow.OnRequest(func(r *colly.Request) {
+		r.Headers.Set("Content-Type", "application/json")
+	})
+	urlRun := fmt.Sprintf(searchURL, string(searchPageJson))
+	zc.CZillow.Visit(urlRun)
 }
 
 func (zc *ZillowCrawler) CrawlMapBounds(pageSource string) MapBounds {
@@ -197,14 +197,19 @@ func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
 		}
 	}
 	// SF
-	sfs := htmlquery.Find(doc, "//span[@data-testid='bed-bath-item']")
-	for _, v := range sfs {
-		if strings.TrimSpace(htmlquery.FindOne(v, "./span/text()").Data) == "sqft" {
-			sf := strings.TrimSpace(htmlquery.FindOne(v, "/strong/text()").Data)
-			if zillowData.SF, err = strconv.ParseFloat(sf, 64); err != nil {
-				log.Fatalln(err)
-			}
-
-		}
+	sfs := htmlquery.FindOne(doc, "//span[@data-testid='bed-bath-item']/span[text()='sqft']/preceding-sibling::strong/text()")
+	sfsData := strings.TrimSpace(sfs.Data)
+	if zillowData.SF, err = strconv.ParseFloat(sfsData, 64); err != nil {
+		log.Fatalln(err)
 	}
+
+	// Est. Payment
+	estPayment := htmlquery.FindOne(doc, "//div[@class='summary-container']//span[text()='Est. payment']/following-sibling::span/text()")
+	zillowData.EstPayment = strings.TrimSpace(estPayment.Data)
+
+	// Principal & Interest $
+	principalInterest := htmlquery.FindOne(doc, "//h5[text()='Principal & interest']/following-sibling::span/text()")
+	zillowData.PrincipalInterest = strings.TrimSpace(principalInterest.Data)
+
+	fmt.Println(zillowData)
 }
