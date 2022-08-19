@@ -34,7 +34,8 @@ const deleteProfileURL string = "http://127.0.0.1:35000/api/v2/profile"
 
 func (ps *Profile) CreateProfile() {
 	oses := []string{"win", "mac", "android", "lin"}
-	browsers := []string{"stealthfox", "mimic"}
+	//browsers := []string{"stealthfox", "mimic"}
+	browsers := []string{"stealthfox"}
 	values := map[string]string{
 		"name":    fmt.Sprint(ps.Name, "-Crawler-", utils.RandInt()),
 		"os":      utils.RandSliceStr(oses),

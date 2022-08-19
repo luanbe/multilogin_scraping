@@ -197,19 +197,27 @@ func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
 		}
 	}
 	// SF
-	sfs := htmlquery.FindOne(doc, "//span[@data-testid='bed-bath-item']/span[text()='sqft']/preceding-sibling::strong/text()")
-	sfsData := strings.TrimSpace(sfs.Data)
-	if zillowData.SF, err = strconv.ParseFloat(sfsData, 64); err != nil {
-		log.Fatalln(err)
+	sfs := htmlquery.Find(doc, "//span[@data-testid='bed-bath-item']")
+	for _, v := range sfs {
+		if strings.Contains(htmlquery.InnerText(v), "sqft") {
+			if v.FirstChild.FirstChild.Data != "" {
+				if zillowData.SF, err = strconv.ParseFloat(
+					strings.Replace(v.FirstChild.FirstChild.Data, ",", "", -1), 64,
+				); err != nil {
+					log.Fatalln(err)
+				}
+			}
+		}
 	}
 
-	// Est. Payment
-	estPayment := htmlquery.FindOne(doc, "//div[@class='summary-container']//span[text()='Est. payment']/following-sibling::span/text()")
-	zillowData.EstPayment = strings.TrimSpace(estPayment.Data)
-
-	// Principal & Interest $
-	principalInterest := htmlquery.FindOne(doc, "//h5[text()='Principal & interest']/following-sibling::span/text()")
-	zillowData.PrincipalInterest = strings.TrimSpace(principalInterest.Data)
-
 	fmt.Println(zillowData)
+	// Est. Payment
+	//estPayment := htmlquery.FindOne(doc, "//div[@class='summary-container']//span[text()='Est. payment']/following-sibling::span/text()")
+	//zillowData.EstPayment = strings.TrimSpace(estPayment.Data)
+	//
+	//// Principal & Interest $
+	//principalInterest := htmlquery.FindOne(doc, "//h5[text()='Principal & interest']/following-sibling::span/text()")
+	//zillowData.PrincipalInterest = strings.TrimSpace(principalInterest.Data)
+	//
+	//fmt.Println(zillowData)
 }
