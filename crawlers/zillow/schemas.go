@@ -218,14 +218,14 @@ type ZillowData struct {
 	SalesPrice                 float64
 	EstPayment                 string
 	PrincipalInterest          string
-	MortgageInsurance          float64
-	PropertyTaxes              float64
-	HomeInsurance              float64
-	Utilities                  float64
+	MortgageInsurance          string
+	PropertyTaxes              string
+	HomeInsurance              string
+	Utilities                  string
 	RentZestimate              float64
 	Zestimate                  float64
-	EstimatedSalesRangeMinimum float64
-	EstimatedSalesRangeMax     float64
+	EstimatedSalesRangeMinimum string
+	EstimatedSalesRangeMax     string
 	Pictures                   []string
 	TimeOnZillow               string
 	Views                      int
@@ -273,7 +273,7 @@ type ZillowData struct {
 	RegionLocation             string
 	Subdivision                string
 	HasHOA                     string
-	HOAFee                     float64
+	HOAFee                     string
 	ServicesIncluded           string
 	AssociationName            string
 	AssociationPhone           string

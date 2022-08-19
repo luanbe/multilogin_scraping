@@ -173,6 +173,8 @@ func (zc *ZillowCrawler) ExtractData(result SearchPageResResult) {
 	if err := zc.WebDriver.Get(zillowData.URL); err != nil {
 		log.Fatalln(err)
 	}
+	// NOTE: time to load source. Need to increase if data was not showing
+	time.Sleep(10 * time.Second)
 	pageSource, err := zc.WebDriver.PageSource()
 	if err != nil {
 		log.Fatalln(err)
@@ -184,7 +186,9 @@ func (zc *ZillowCrawler) ExtractData(result SearchPageResResult) {
 }
 
 func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
+	//htmlquery.DisableSelectorCache = true
 	doc, err := htmlquery.Parse(strings.NewReader(source))
+
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -196,28 +200,62 @@ func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
 			zillowData.Address += v.Data
 		}
 	}
+
 	// SF
-	sfs := htmlquery.Find(doc, "//span[@data-testid='bed-bath-item']")
-	for _, v := range sfs {
-		if strings.Contains(htmlquery.InnerText(v), "sqft") {
-			if v.FirstChild.FirstChild.Data != "" {
-				if zillowData.SF, err = strconv.ParseFloat(
-					strings.Replace(v.FirstChild.FirstChild.Data, ",", "", -1), 64,
-				); err != nil {
-					log.Fatalln(err)
-				}
-			}
+	sf := htmlquery.FindOne(doc, "//span[@data-testid='bed-bath-item']/span[normalize-space(text())='sqft']/preceding-sibling::strong/text()")
+	if sf != nil {
+		if zillowData.SF, err = strconv.ParseFloat(strings.Replace(sf.Data, ",", "", -1), 64); err != nil {
+			log.Fatalln(err)
 		}
 	}
 
-	fmt.Println(zillowData)
 	// Est. Payment
-	//estPayment := htmlquery.FindOne(doc, "//div[@class='summary-container']//span[text()='Est. payment']/following-sibling::span/text()")
-	//zillowData.EstPayment = strings.TrimSpace(estPayment.Data)
-	//
-	//// Principal & Interest $
-	//principalInterest := htmlquery.FindOne(doc, "//h5[text()='Principal & interest']/following-sibling::span/text()")
-	//zillowData.PrincipalInterest = strings.TrimSpace(principalInterest.Data)
-	//
-	//fmt.Println(zillowData)
+	estPayment := htmlquery.FindOne(doc, "//div[@class='summary-container']//span[contains(text(), 'Est. payment')]/following-sibling::span/text()")
+	if estPayment != nil {
+		zillowData.EstPayment = strings.TrimSpace(estPayment.Data)
+	}
+
+	// Principal & Interest $
+	principalInterest := htmlquery.FindOne(doc, "//h5[normalize-space(text())='Principal & interest']/following-sibling::span/text()")
+	if principalInterest != nil {
+		zillowData.PrincipalInterest = strings.TrimSpace(principalInterest.Data)
+	}
+	// Mortgage Insurance $
+	mortgageInsurance := htmlquery.FindOne(doc, "//h5[normalize-space(text())='Mortgage insurance']/following-sibling::span/text()")
+	if mortgageInsurance != nil {
+		zillowData.MortgageInsurance = strings.TrimSpace(mortgageInsurance.Data)
+	}
+
+	// Property Taxes $
+	propertyTaxes := htmlquery.FindOne(doc, "//h5[normalize-space(text())='Property taxes']/following-sibling::span/text()")
+	if propertyTaxes != nil {
+		zillowData.PropertyTaxes = strings.TrimSpace(propertyTaxes.Data)
+	}
+
+	// Home Insurance $
+	homeInsurance := htmlquery.FindOne(doc, "//h5[contains(text(), 'Home insurance')]/following-sibling::span/text()")
+	if homeInsurance != nil {
+		zillowData.HomeInsurance = strings.TrimSpace(homeInsurance.Data)
+	}
+
+	// HOA Fees $
+	hoaFees := htmlquery.FindOne(doc, "//h5[contains(text(), 'HOA fee')]/following-sibling::span/text()")
+	if hoaFees != nil {
+		zillowData.HOAFee = strings.TrimSpace(hoaFees.Data)
+	}
+
+	// Utilities $
+	utilities := htmlquery.FindOne(doc, "//h5[contains(text(), \"Utilities\")]/following-sibling::span/text()")
+	if utilities != nil {
+		zillowData.Utilities = strings.TrimSpace(utilities.Data)
+	}
+
+	// Estimated Sales Range
+	estimatedSalesRange := htmlquery.FindOne(doc, "//span[contains(text(), 'Estimated sales range')]/span/text()")
+	if estimatedSalesRange != nil {
+		estimatedSalesRangeList := strings.Split(strings.TrimSpace(estimatedSalesRange.Data), "-")
+		zillowData.EstimatedSalesRangeMinimum = strings.TrimSpace(estimatedSalesRangeList[0])
+		zillowData.EstimatedSalesRangeMax = strings.TrimSpace(estimatedSalesRangeList[1])
+	}
+	fmt.Println(zillowData)
 }
