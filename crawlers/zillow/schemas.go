@@ -233,7 +233,7 @@ type ZillowData struct {
 	Overview                   string
 	ZillowCheckedDate          string
 	DataUploadedDate           string
-	ListedBy                   string
+	ListedBy                   []string
 	Source                     string
 	MLS                        string
 	PropertyType               string

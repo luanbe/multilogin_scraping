@@ -204,7 +204,9 @@ func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
 	// SF
 	sf := htmlquery.FindOne(doc, "//span[@data-testid='bed-bath-item']/span[normalize-space(text())='sqft']/preceding-sibling::strong/text()")
 	if sf != nil {
-		if zillowData.SF, err = strconv.ParseFloat(strings.Replace(sf.Data, ",", "", -1), 64); err != nil {
+		sfData := strings.Replace(sf.Data, ",", "", -1)
+		sfData = strings.Replace(sfData, "-", "", -1)
+		if zillowData.SF, err = strconv.ParseFloat(sfData, 64); err != nil {
 			log.Fatalln(err)
 		}
 	}
@@ -256,6 +258,71 @@ func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
 		estimatedSalesRangeList := strings.Split(strings.TrimSpace(estimatedSalesRange.Data), "-")
 		zillowData.EstimatedSalesRangeMinimum = strings.TrimSpace(estimatedSalesRangeList[0])
 		zillowData.EstimatedSalesRangeMax = strings.TrimSpace(estimatedSalesRangeList[1])
+	}
+
+	// Pictures
+	pictures := htmlquery.Find(doc, "//*[contains(@class, \"media-stream-tile\")]//img")
+	if pictures != nil {
+		for _, pic := range pictures {
+			zillowData.Pictures = append(zillowData.Pictures, htmlquery.SelectAttr(pic, "src"))
+		}
+	}
+
+	// Time On Zillow
+	timeOnZillow := htmlquery.FindOne(doc, "//dt[contains(text(), \"Time on Zillow\")]/following-sibling::dd/strong/text()")
+	if timeOnZillow != nil {
+		zillowData.TimeOnZillow = timeOnZillow.Data
+	}
+
+	// Views
+	views := htmlquery.FindOne(doc, "//dt/button[contains(text(), \"Views\") ]/parent::dt/following-sibling::dd/strong/text()")
+	if views != nil {
+		viewsData := strings.TrimSpace(views.Data)
+		if zillowData.Views, err = strconv.Atoi(viewsData); err != nil {
+			log.Fatalln(err)
+		}
+	}
+
+	// Saves
+	saves := htmlquery.FindOne(doc, "//dt/button[contains(text(), \"Saves\") ]/parent::dt/following-sibling::dd/strong/text()")
+	if saves != nil {
+		savesData := strings.TrimSpace(saves.Data)
+		if zillowData.Saves, err = strconv.Atoi(savesData); err != nil {
+			log.Fatalln(err)
+		}
+	}
+
+	// Overview
+	overview := htmlquery.FindOne(doc, "//h4[contains(text(), \"Overview\")]/following-sibling::div//div[contains(@class, \"Spacer\")]//div[contains(@class, \"Text\")]/text()")
+	if overview != nil {
+		zillowData.Overview = overview.Data
+	}
+	// MLS
+	mls := htmlquery.FindOne(doc, "//span[contains(text(), \"MLS#:\")]/text()")
+	if mls != nil {
+		zillowData.MLS = strings.Replace(mls.Data, "MLS#:", "", -1)
+	}
+
+	// Zillow Checked Date
+	zillowCheckedDate := htmlquery.FindOne(doc, "//*[contains(text(), \"Zillow checked:\")]/text()")
+	if zillowCheckedDate != nil {
+		zillowData.ZillowCheckedDate = strings.Replace(zillowCheckedDate.Data, "Zillow checked:", "", -1)
+	}
+
+	// Data Uploaded Date
+	dataUploadedDate := htmlquery.FindOne(doc, "//*[contains(text(), \"Data updated:\")]/text()")
+	if dataUploadedDate != nil {
+		zillowData.DataUploadedDate = strings.Replace(dataUploadedDate.Data, "Data updated:", "", -1)
+	}
+	// Listed By
+	listBy := htmlquery.Find(doc, "//*[contains(text(), \"Listed by:\")]/following-sibling::span/p/text()")
+	if listBy != nil {
+		for _, listByValue := range listBy {
+			if listByValue.Data != "" {
+				zillowData.ListedBy = append(zillowData.ListedBy, listByValue.Data)
+			}
+
+		}
 	}
 	fmt.Println(zillowData)
 }
