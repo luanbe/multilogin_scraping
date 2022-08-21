@@ -1,0 +1,20 @@
+{
+  "debug": true,
+  "server": {
+    "address": ":3000"
+  },
+  "context":{
+    "timeout":2
+  },
+  "database": {
+    "driver": "postgres",
+    "host": "localhost",
+    "port": 5432,
+    "username": "luanbe68",
+    "password": "luanbe68",
+    "dbname": "luanbe68"
+  },
+  "session": {
+    "auth-user-key": "luabbe68"
+  }
+}

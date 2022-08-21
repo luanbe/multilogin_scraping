@@ -221,6 +221,7 @@ type ZillowData struct {
 	MortgageInsurance          string
 	PropertyTaxes              string
 	HomeInsurance              string
+	HOAFee                     string
 	Utilities                  string
 	RentZestimate              float64
 	Zestimate                  float64
@@ -240,27 +241,29 @@ type ZillowData struct {
 	YearBuilt                  string
 	NaturalGas                 bool
 	CentralAir                 bool
-	OfGarageSpaces             bool
-	HOAAmount                  float64
-	LotSize                    string
-	BuyerAgentFee              float64
+	OfGarageSpaces             string
+	HOAAmount                  string
+	LotSizeSF                  string
+	LotSizeAcres               string
+	BuyerAgentFee              string
 	Appliances                 string
-	LivingRoomLevel            int
+	LivingRoomLevel            string
 	LivingRoomDimensions       string
 	InteriorFeatures           string
 	PrimaryBedroomLevel        string
 	PrimaryBedroomDimensions   string
 	Basement                   string
 	TotalInteriorLivableAreaSF string
-	OfFireplaces               int
+	OfFireplaces               string
 	FireplaceFeatures          string
 	FlooringType               string
 	HeatingType                string
 	TotalParkingSpaces         string
 	ParkingFeatures            string
 	LotFeatures                string
-	CoveredSpaces              int
+	CoveredSpaces              string
 	ParcelNumber               string
+	LevelsStoriesFloors        string
 	PatioAndPorchDetails       string
 	HomeType                   string
 	ProperySubType             string
@@ -273,15 +276,16 @@ type ZillowData struct {
 	RegionLocation             string
 	Subdivision                string
 	HasHOA                     string
-	HOAFee                     string
+	HOAFeeDetail               string
 	ServicesIncluded           string
 	AssociationName            string
 	AssociationPhone           string
-	AnnualTaxAmount            float64
+	AnnualTaxAmount            string
 	ElementarySchool           string
 	MiddleSchool               string
 	HighSchool                 string
 	District                   string
+	DataSource                 string
 	CountyTaxAssessorURL       string
 	TimestampForDataExtraction string
 }

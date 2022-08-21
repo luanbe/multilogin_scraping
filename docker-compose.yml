@@ -1,0 +1,44 @@
+version: '3'
+
+volumes:
+  mariadb:
+    driver: local
+
+networks:
+  db:
+    driver: bridge
+
+services:
+  mariadb:
+    image: mariadb:10.6
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: crawler
+      MYSQL_USER:  crawler
+      MYSQL_PASSWORD: crawler
+    command:
+      - "mysqld --init-file /data/application/db_local.sql"
+    expose:
+      - "40000"
+    ports:
+      - "40000:3306"
+    volumes:
+      - mariadb:/var/lib/mysql
+      - ./db_local.sql:/data/application/db_local.sql
+    networks:
+      db:
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    restart: always
+    expose:
+      - "40001"
+    ports:
+      - "40001:80"
+    environment:
+      - PMA_HOST=mariadb
+      - PMA_PORT=3306
+    depends_on:
+      - mariadb
+    networks:
+      db:

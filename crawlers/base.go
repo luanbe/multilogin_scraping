@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"multilogin_scraping/utils"
+	"multilogin_scraping/pkg/utils"
 	"net/http"
 	"time"
 
@@ -37,9 +37,9 @@ func (ps *Profile) CreateProfile() {
 	//browsers := []string{"stealthfox", "mimic"}
 	browsers := []string{"stealthfox"}
 	values := map[string]string{
-		"name":    fmt.Sprint(ps.Name, "-Crawler-", utils.RandInt()),
-		"os":      utils.RandSliceStr(oses),
-		"browser": utils.RandSliceStr(browsers),
+		"name":    fmt.Sprint(ps.Name, "-Crawler-", util.RandInt()),
+		"os":      util.RandSliceStr(oses),
+		"browser": util.RandSliceStr(browsers),
 	}
 	jsonData, err := json.Marshal(values)
 
