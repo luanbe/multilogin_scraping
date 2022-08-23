@@ -6,10 +6,10 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/luanbe/golang-web-app-structure/app/service"
-	"github.com/luanbe/golang-web-app-structure/templates"
+	"multilogin_scraping/app/service"
+	"multilogin_scraping/templates"
 
-	"github.com/luanbe/golang-web-app-structure/helper"
+	"multilogin_scraping/helper"
 )
 
 type UserDelivery struct {

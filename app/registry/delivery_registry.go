@@ -2,8 +2,8 @@ package registry
 
 import (
 	"github.com/alexedwards/scs/v2"
-	"github.com/luanbe/golang-web-app-structure/app/delivery/delivery_admin"
-	"github.com/luanbe/golang-web-app-structure/app/service"
+	"multilogin_scraping/app/delivery/delivery_admin"
+	"multilogin_scraping/app/service"
 )
 
 func RegisterIndexAdminDelivery(

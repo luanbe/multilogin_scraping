@@ -9,15 +9,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/luanbe/golang-web-app-structure/app/delivery"
-	"github.com/luanbe/golang-web-app-structure/app/models/entity"
-	"github.com/luanbe/golang-web-app-structure/app/registry"
-	"github.com/luanbe/golang-web-app-structure/helper/database"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
+	"multilogin_scraping/app/delivery"
+	"multilogin_scraping/app/models/entity"
+	"multilogin_scraping/app/registry"
+	"multilogin_scraping/helper/database"
 )
 
-//TODO: add logger later
+// TODO: add logger later
 func InitDb() (*gorm.DB, error) {
 	db, err := database.NewConnectionDB(
 		viper.GetString("database.driver"),
@@ -35,7 +35,7 @@ func InitDb() (*gorm.DB, error) {
 	// db.Migrator().DropTable(&entity.User{})
 
 	// Define auto migration here
-	_ = db.AutoMigrate(&entity.User{})
+	_ = db.AutoMigrate(&entity.User{}, &entity.Maindb3{}, &entity.ZillowData{})
 
 	//seedingPredefined(db, logger)
 

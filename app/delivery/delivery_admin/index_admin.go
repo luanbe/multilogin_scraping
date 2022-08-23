@@ -3,15 +3,15 @@ package delivery_admin
 import (
 	"fmt"
 	"github.com/alexedwards/scs/v2"
-	"github.com/luanbe/golang-web-app-structure/app/middlewares"
 	"github.com/spf13/viper"
+	"multilogin_scraping/app/middlewares"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/luanbe/golang-web-app-structure/app/service"
-	"github.com/luanbe/golang-web-app-structure/helper"
-	"github.com/luanbe/golang-web-app-structure/templates"
 	"golang.org/x/crypto/bcrypt"
+	"multilogin_scraping/app/service"
+	"multilogin_scraping/helper"
+	"multilogin_scraping/templates"
 )
 
 type IndexAdminDelivery struct {

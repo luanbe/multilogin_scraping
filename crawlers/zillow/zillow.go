@@ -12,6 +12,7 @@ import (
 	"github.com/antchfx/htmlquery"
 	"github.com/gocolly/colly"
 	"github.com/tebeka/selenium"
+	"multilogin_scraping/app/models/entity"
 )
 
 type ZillowCrawler struct {
@@ -20,11 +21,12 @@ type ZillowCrawler struct {
 	Profile       *crawlers.Profile
 	CZillow       *colly.Collector
 	SearchPageReq *SearchPageReq
+	Maindb3       *entity.Maindb3
 }
 
 const searchURL = "https://www.zillow.com/search/GetSearchPageState.htm?searchQueryState=%s&wants={\"cat1\":[\"listResults\",\"mapResults\"],\"cat2\":[\"total\"],\"regionResults\":[\"total\"]}&requestId=5"
 
-func NewZillowCrawler(c *colly.Collector) *ZillowCrawler {
+func NewZillowCrawler(c *colly.Collector, maindb3 *entity.Maindb3) *ZillowCrawler {
 	BaseSel := crawlers.NewBaseSelenium()
 	BaseSel.StartSelenium("zillow")
 	userAgent, err := BaseSel.WebDriver.ExecuteScript("return navigator.userAgent", nil)
@@ -32,24 +34,30 @@ func NewZillowCrawler(c *colly.Collector) *ZillowCrawler {
 		log.Fatalln(err)
 	}
 	c.UserAgent = userAgent.(string)
-	return &ZillowCrawler{WebDriver: BaseSel.WebDriver, BaseSel: BaseSel, Profile: BaseSel.Profile, CZillow: c}
+	return &ZillowCrawler{WebDriver: BaseSel.WebDriver, BaseSel: BaseSel, Profile: BaseSel.Profile, CZillow: c, Maindb3: maindb3}
 }
 
-func (zc *ZillowCrawler) RunZillowCrawler() {
-	address := "Urb Santa Elvira, PR"
-	address = strings.Replace(address, " ", "-", -1)
-	url := fmt.Sprint("https://www.zillow.com/homes/", address, "_rb/")
+func (zc *ZillowCrawler) RunZillowCrawler(exactAddress bool) {
 	defer zc.BaseSel.StopSelenium()
-	if err := zc.WebDriver.Get(url); err != nil {
-		log.Fatalln(err)
+	// Crawling exact address
+	if exactAddress == true {
+		address := fmt.Sprint(strings.TrimSpace(zc.Maindb3.OwnerAddress), ", ", zc.Maindb3.OwnerCityState)
+		address = strings.Replace(address, " ", "-", -1)
+		url := fmt.Sprint("https://www.zillow.com/homes/", address, "_rb/")
+		zillowData := &ZillowData{}
+		zc.CrawlAddress(url, zillowData)
+		return
 	}
-	pageSource, err := zc.WebDriver.PageSource()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	zc.CheckVerifyHuman(pageSource)
-	zc.CrawlData(zc.CrawlMapBounds(pageSource))
+	// defer zc.BaseSel.StopSelenium()
+	//if err := zc.WebDriver.Get(url); err != nil {
+	//	log.Fatalln(err)
+	//}
+	//pageSource, err := zc.WebDriver.PageSource()
+	//if err != nil {
+	//	log.Fatalln(err)
+	//}
+	//zc.CheckVerifyHuman(pageSource)
+	//zc.CrawlData(zc.CrawlMapBounds(pageSource))
 	//fmt.Println(zc.WebDriver.GetCookies())
 }
 
@@ -96,7 +104,7 @@ func (zc *ZillowCrawler) CrawlData(mapBounds MapBounds) {
 		}
 		if len(data.Cat1.SearchResults.ListResults) > 0 {
 			for _, result := range data.Cat1.SearchResults.ListResults {
-				zc.ExtractData(result)
+				zc.CollectionData(result)
 			}
 
 			// Crawling data on Next Page
@@ -163,7 +171,7 @@ func (zc *ZillowCrawler) CrawlMapBounds(pageSource string) MapBounds {
 	}
 }
 
-func (zc *ZillowCrawler) ExtractData(result SearchPageResResult) {
+func (zc *ZillowCrawler) CollectionData(result SearchPageResResult) {
 	propertyStatus := false
 	if result.Beds > 0 || result.Baths > 0 {
 		propertyStatus = true
@@ -182,7 +190,11 @@ func (zc *ZillowCrawler) ExtractData(result SearchPageResResult) {
 		RentZestimate:  result.HdpData.HomeInfo.RentZestimate,
 		Zestimate:      result.HdpData.HomeInfo.Zestimate,
 	}
-	if err := zc.WebDriver.Get(zillowData.URL); err != nil {
+	zc.CrawlAddress(zillowData.URL, zillowData)
+}
+
+func (zc *ZillowCrawler) CrawlAddress(address string, zillowData *ZillowData) {
+	if err := zc.WebDriver.Get(address); err != nil {
 		log.Fatalln(err)
 	}
 	// NOTE: time to load source. Need to increase if data was not showing

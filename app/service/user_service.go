@@ -1,8 +1,8 @@
 package service
 
 import (
-	"github.com/luanbe/golang-web-app-structure/app/models/entity"
-	"github.com/luanbe/golang-web-app-structure/app/repository"
+	"multilogin_scraping/app/models/entity"
+	"multilogin_scraping/app/repository"
 )
 
 type UserService interface {

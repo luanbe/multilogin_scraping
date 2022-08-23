@@ -16,15 +16,12 @@ services:
       MYSQL_ROOT_PASSWORD: crawler
       MYSQL_USER:  crawler
       MYSQL_PASSWORD: crawler
-    command:
-      - "mysqld --init-file /data/application/db_local.sql"
     expose:
       - "40000"
     ports:
       - "40000:3306"
     volumes:
       - mariadb:/var/lib/mysql
-      - ./db_local.sql:/data/application/db_local.sql
     networks:
       db:
 

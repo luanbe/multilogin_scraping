@@ -1,6 +1,6 @@
 package repository
 
-import "github.com/luanbe/golang-web-app-structure/app/models/entity"
+import "multilogin_scraping/app/models/entity"
 
 type UserRepository interface {
 	AddUser(user *entity.User) error

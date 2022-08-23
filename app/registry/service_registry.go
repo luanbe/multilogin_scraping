@@ -1,9 +1,9 @@
 package registry
 
 import (
-	rp "github.com/luanbe/golang-web-app-structure/app/repository"
-	"github.com/luanbe/golang-web-app-structure/app/service"
 	"gorm.io/gorm"
+	rp "multilogin_scraping/app/repository"
+	"multilogin_scraping/app/service"
 )
 
 // Todo: Add logger later
@@ -11,4 +11,10 @@ func RegisterUserService(db *gorm.DB) service.UserService {
 	return service.NewUserService(
 		rp.NewBaseRepository(db),
 		rp.NewUserRepository(rp.NewBaseRepository(db)))
+}
+
+func RegisterMaindb3Service(db *gorm.DB) service.Maindb3Service {
+	return service.NewMaindb3Service(
+		rp.NewBaseRepository(db),
+		rp.NewMaindb3Repository(rp.NewBaseRepository(db)))
 }

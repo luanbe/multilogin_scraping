@@ -1,15 +1,14 @@
 package entity
 
-import "github.com/luanbe/golang-web-app-structure/app/models/base"
+import "multilogin_scraping/app/models/base"
 
 // TODO: Use swagger later
 type User struct {
 	base.BaseIDModel
-	Email     string `gorm:"not null, uniqueIndex" json:"email"`
+	Email     string `gorm:"type:varchar(100); not null; uniqueIndex" json:"email"`
 	Password  string `gorm:"not null" json:"password"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Phone     string `json:"phone"`
-	Address   string `json:"address"`
-	Gender    string `json:"gender"`
+	FirstName string `gorm:"type:varchar(100)" json:"first_name"`
+	LastName  string `gorm:"type:varchar(100)" json:"last_name"`
+	Phone     string `gorm:"type:varchar(150)" json:"phone"`
+	Address   string `gorm:"type:varchar(255)" json:"address"`
 }

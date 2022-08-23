@@ -1,21 +1,21 @@
 package base
 
 import (
-	util "github.com/luanbe/golang-web-app-structure/pkg/utils"
 	"gorm.io/gorm"
+	util "multilogin_scraping/pkg/utils"
 	"time"
 )
 
 type BaseIDModel struct {
-	//gorm.Model
+	gorm.Model
 	// Id of as primary key
 	// in: int64
 	ID uint64 `gorm:"primary_key:auto_increment" json:"id"`
 
 	IsDeleted bool      `json:"is_deleted"`
-	CreatedBy string    `json:"-" gorm:"type:varchar"`
+	CreatedBy string    `json:"-" gorm:"type:varchar(255)"`
 	CreatedAt time.Time `json:"-"`
-	UpdatedBy string    `json:"-" gorm:"type:varchar"`
+	UpdatedBy string    `json:"-" gorm:"type:varchar(255)"`
 	UpdatedAt time.Time `json:"-"`
 }
 

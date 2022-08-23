@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/luanbe/golang-web-app-structure/helper"
-	"github.com/luanbe/golang-web-app-structure/templates"
+	"multilogin_scraping/helper"
+	"multilogin_scraping/templates"
 )
 
 type IndexDelivery struct {

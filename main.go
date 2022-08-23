@@ -2,9 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/luanbe/golang-web-app-structure/initialization"
+	"github.com/gocolly/colly"
 	"github.com/spf13/viper"
+	"gorm.io/gorm"
 	"log"
+	"multilogin_scraping/app/models/entity"
+	"multilogin_scraping/app/registry"
+	"multilogin_scraping/crawlers/zillow"
+	"multilogin_scraping/initialization"
 	"net/http"
 )
 
@@ -34,9 +39,31 @@ func main() {
 	// Int Router
 	router := initialization.InitRouting(db, sessionManager)
 
+	RunCrawler(db)
+
 	fmt.Printf("Server START on port%v\n", viper.GetString("server.address"))
 	log.Fatal(http.ListenAndServe(
 		viper.GetString("server.address"),
 		sessionManager.LoadAndSave(router),
 	))
+
+}
+func RunCrawler(db *gorm.DB) {
+	c := colly.NewCollector()
+
+	zillowService := registry.RegisterMaindb3Service(db)
+	maindb3List := zillowService.ListMaindb3Data(
+		viper.GetString("crawler.zillow_crawler.crawling_succeed_status"),
+		viper.GetInt("crawler.zillow_crawler.concurrent"),
+	)
+	for _, maindb3 := range maindb3List {
+		go RunZillowCrawler(c, maindb3)
+	}
+
+}
+
+func RunZillowCrawler(c *colly.Collector, maindb3 *entity.Maindb3) {
+	cZillow := c.Clone()
+	zillowCrawler := zillow.NewZillowCrawler(cZillow, maindb3)
+	zillowCrawler.RunZillowCrawler(true)
 }

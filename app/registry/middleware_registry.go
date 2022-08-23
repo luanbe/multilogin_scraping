@@ -2,7 +2,7 @@ package registry
 
 import (
 	"github.com/alexedwards/scs/v2"
-	"github.com/luanbe/golang-web-app-structure/app/middlewares"
+	"multilogin_scraping/app/middlewares"
 )
 
 func RegisterAdminMiddleware(sessionManager *scs.SessionManager) middlewares.AdminMiddleware {

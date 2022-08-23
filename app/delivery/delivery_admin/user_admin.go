@@ -2,12 +2,12 @@ package delivery_admin
 
 import (
 	"github.com/alexedwards/scs/v2"
-	"github.com/luanbe/golang-web-app-structure/app/service"
+	"multilogin_scraping/app/service"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/luanbe/golang-web-app-structure/helper"
-	"github.com/luanbe/golang-web-app-structure/templates"
+	"multilogin_scraping/helper"
+	"multilogin_scraping/templates"
 )
 
 type UserAdminDelivery struct {
