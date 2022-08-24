@@ -8,6 +8,7 @@ import (
 
 type Maindb3Service interface {
 	ListMaindb3Data(crawlingStatus string, limit int) []*entity.Maindb3
+	UpdateStatus(maindb3 *entity.Maindb3, status string)
 }
 
 type Maindb3ServiceImpl struct {
@@ -25,10 +26,16 @@ func NewMaindb3Service(
 }
 
 func (s *Maindb3ServiceImpl) ListMaindb3Data(crawlingStatus string, limit int) []*entity.Maindb3 {
-	s.baseRepo.BeginTx()
+	//s.baseRepo.BeginTx()
 	result, err := s.maindb3Repo.ListMaindb3(crawlingStatus, limit)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	return result
+}
+
+func (s *Maindb3ServiceImpl) UpdateStatus(maindb3 *entity.Maindb3, status string) {
+	if err := s.maindb3Repo.UpdateMaindb3(maindb3, map[string]interface{}{"crawling_status": status}); err != nil {
+		log.Fatalln(err)
+	}
 }

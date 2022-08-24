@@ -18,3 +18,9 @@ func RegisterMaindb3Service(db *gorm.DB) service.Maindb3Service {
 		rp.NewBaseRepository(db),
 		rp.NewMaindb3Repository(rp.NewBaseRepository(db)))
 }
+
+func RegisterZillowService(db *gorm.DB) service.ZillowService {
+	return service.NewZillowService(
+		rp.NewBaseRepository(db),
+		rp.NewZillowRepository(rp.NewBaseRepository(db)))
+}

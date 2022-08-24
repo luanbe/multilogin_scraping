@@ -44,7 +44,7 @@ type SearchPageResResult struct {
 	AddressZipcode        string      `json:"addressZipcode"`
 	IsUndisclosedAddress  bool        `json:"isUndisclosedAddress"`
 	Beds                  int         `json:"beds"`
-	Baths                 float64     `json:"baths"`
+	Baths                 int         `json:"baths"`
 	Area                  int         `json:"area"`
 	LatLong               struct {
 		Latitude  float64 `json:"latitude"`
@@ -69,8 +69,8 @@ type SearchPageResResult struct {
 			Latitude        float64 `json:"latitude"`
 			Longitude       float64 `json:"longitude"`
 			Price           float64 `json:"price"`
-			Bathrooms       float64 `json:"bathrooms"`
-			Bedrooms        float64 `json:"bedrooms"`
+			Bathrooms       int     `json:"bathrooms"`
+			Bedrooms        int     `json:"bedrooms"`
 			LivingArea      float64 `json:"livingArea"`
 			HomeType        string  `json:"homeType"`
 			HomeStatus      string  `json:"homeStatus"`

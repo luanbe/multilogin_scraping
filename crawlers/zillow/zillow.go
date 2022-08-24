@@ -3,8 +3,11 @@ package zillow
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/spf13/viper"
 	"log"
+	"multilogin_scraping/app/service"
 	"multilogin_scraping/crawlers"
+	util2 "multilogin_scraping/pkg/utils"
 	"strconv"
 	"strings"
 	"time"
@@ -16,25 +19,29 @@ import (
 )
 
 type ZillowCrawler struct {
-	WebDriver     selenium.WebDriver
-	BaseSel       *crawlers.BaseSelenium
-	Profile       *crawlers.Profile
-	CZillow       *colly.Collector
-	SearchPageReq *SearchPageReq
-	Maindb3       *entity.Maindb3
+	WebDriver      selenium.WebDriver
+	BaseSel        *crawlers.BaseSelenium
+	Profile        *crawlers.Profile
+	CZillow        *colly.Collector
+	SearchPageReq  *SearchPageReq
+	Maindb3        *entity.Maindb3
+	ZillowService  service.ZillowService
+	Maindb3Service service.Maindb3Service
 }
 
 const searchURL = "https://www.zillow.com/search/GetSearchPageState.htm?searchQueryState=%s&wants={\"cat1\":[\"listResults\",\"mapResults\"],\"cat2\":[\"total\"],\"regionResults\":[\"total\"]}&requestId=5"
 
-func NewZillowCrawler(c *colly.Collector, maindb3 *entity.Maindb3) *ZillowCrawler {
+func NewZillowCrawler(c *colly.Collector, maindb3 *entity.Maindb3, zillowService service.ZillowService, maindb3Service service.Maindb3Service) *ZillowCrawler {
 	BaseSel := crawlers.NewBaseSelenium()
-	BaseSel.StartSelenium("zillow")
+	if baseSelenium := BaseSel.StartSelenium("zillow"); baseSelenium == nil {
+		return nil
+	}
 	userAgent, err := BaseSel.WebDriver.ExecuteScript("return navigator.userAgent", nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	c.UserAgent = userAgent.(string)
-	return &ZillowCrawler{WebDriver: BaseSel.WebDriver, BaseSel: BaseSel, Profile: BaseSel.Profile, CZillow: c, Maindb3: maindb3}
+	return &ZillowCrawler{WebDriver: BaseSel.WebDriver, BaseSel: BaseSel, Profile: BaseSel.Profile, CZillow: c, Maindb3: maindb3, ZillowService: zillowService, Maindb3Service: maindb3Service}
 }
 
 func (zc *ZillowCrawler) RunZillowCrawler(exactAddress bool) {
@@ -44,7 +51,7 @@ func (zc *ZillowCrawler) RunZillowCrawler(exactAddress bool) {
 		address := fmt.Sprint(strings.TrimSpace(zc.Maindb3.OwnerAddress), ", ", zc.Maindb3.OwnerCityState)
 		address = strings.Replace(address, " ", "-", -1)
 		url := fmt.Sprint("https://www.zillow.com/homes/", address, "_rb/")
-		zillowData := &ZillowData{}
+		zillowData := &entity.ZillowData{}
 		zc.CrawlAddress(url, zillowData)
 		return
 	}
@@ -178,7 +185,7 @@ func (zc *ZillowCrawler) CollectionData(result SearchPageResResult) {
 	}
 	halfBathRooms := result.HdpData.HomeInfo.Bedrooms / 2
 	fullBathRooms := result.HdpData.HomeInfo.Bathrooms - halfBathRooms
-	zillowData := &ZillowData{
+	zillowData := &entity.ZillowData{
 		URL:            result.DetailURL,
 		Address:        result.Address,
 		PropertyStatus: propertyStatus,
@@ -193,7 +200,7 @@ func (zc *ZillowCrawler) CollectionData(result SearchPageResResult) {
 	zc.CrawlAddress(zillowData.URL, zillowData)
 }
 
-func (zc *ZillowCrawler) CrawlAddress(address string, zillowData *ZillowData) {
+func (zc *ZillowCrawler) CrawlAddress(address string, zillowData *entity.ZillowData) {
 	if err := zc.WebDriver.Get(address); err != nil {
 		log.Fatalln(err)
 	}
@@ -205,16 +212,77 @@ func (zc *ZillowCrawler) CrawlAddress(address string, zillowData *ZillowData) {
 	}
 	zc.CheckVerifyHuman(pageSource)
 	zc.ParseData(pageSource, zillowData)
+	zc.UpdateDB(zillowData)
+	fmt.Println("ZillowCrawler: Crawled ", zillowData.URL)
 
 	time.Sleep(3 * time.Second)
 }
 
-func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
+func (zc *ZillowCrawler) UpdateDB(zillowData *entity.ZillowData) {
+	zc.ZillowService.AddZillow(zillowData)
+	zc.Maindb3Service.UpdateStatus(zc.Maindb3, viper.GetString("crawler.crawler_status.succeeded"))
+}
+
+func (zc *ZillowCrawler) ParseData(source string, zillowData *entity.ZillowData) *entity.ZillowData {
 	//htmlquery.DisableSelectorCache = true
 	doc, err := htmlquery.Parse(strings.NewReader(source))
 
 	if err != nil {
 		log.Fatalln(err)
+	}
+	if zillowData.URL == "" {
+		if zillowData.URL, err = zc.BaseSel.WebDriver.CurrentURL(); err != nil {
+			log.Fatalln(err)
+		}
+	}
+
+	// bed path SF
+	if zillowData.Bed == 0 || zillowData.Bath == 0 {
+		bedPathItems := htmlquery.Find(doc, "//span[contains(@data-testid,\"bed-bath\")]/span | //span[contains(@data-testid,\"bed-bath\")]/button")
+		for _, item := range bedPathItems {
+			itemText := htmlquery.InnerText(item)
+			if strings.Contains(itemText, "bd") {
+				bedStr := strings.Replace(itemText, "bd", "", -1)
+				bedStr = util2.RemoveSpecialCharacters(bedStr)
+				bedStr = strings.TrimSpace(bedStr)
+				if bedStr != "" {
+					zillowData.Bed, err = strconv.Atoi(bedStr)
+					if err != nil {
+						log.Fatalln(err)
+					}
+				}
+
+			}
+			if strings.Contains(itemText, "ba") {
+				bathStr := strings.Replace(itemText, "ba", "", -1)
+				bathStr = util2.RemoveSpecialCharacters(bathStr)
+				bathStr = strings.TrimSpace(bathStr)
+				if bathStr != "" {
+					zillowData.Bath, err = strconv.Atoi(bathStr)
+					if err != nil {
+						log.Fatalln(err)
+					}
+				}
+
+			}
+			if strings.Contains(itemText, "sqft") {
+				sfStr := strings.Replace(itemText, "sqft", "", -1)
+				sfStr = strings.Replace(sfStr, ",", ".", -1)
+				sfStr = strings.Replace(sfStr, "-", "", -1)
+				sfStr = util2.RemoveSpecialCharacters(sfStr)
+				sfStr = strings.TrimSpace(sfStr)
+				if sfStr != "" {
+					if zillowData.SF, err = strconv.ParseFloat(sfStr, 64); err != nil {
+						log.Fatalln(err)
+					}
+				}
+			}
+		}
+	}
+
+	// Property Status
+	if zillowData.Bed > 0 || zillowData.Bath > 0 {
+		zillowData.PropertyStatus = true
 	}
 
 	// Address
@@ -225,13 +293,92 @@ func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
 		}
 	}
 
-	// SF
-	sf := htmlquery.FindOne(doc, "//span[@data-testid='bed-bath-item']/span[normalize-space(text())='sqft']/preceding-sibling::strong/text()")
-	if sf != nil {
-		sfData := strings.Replace(sf.Data, ",", "", -1)
-		sfData = strings.Replace(sfData, "-", "", -1)
-		if zillowData.SF, err = strconv.ParseFloat(sfData, 64); err != nil {
-			log.Fatalln(err)
+	// Full Bathrooms
+	if zillowData.FullBathrooms == 0 {
+		fullPathRoom := htmlquery.FindOne(doc, "//span[contains(text(), \"Full bathrooms\")]")
+		if fullPathRoom != nil {
+			fullPathRoomText := htmlquery.InnerText(fullPathRoom)
+			fullPathRoomText = strings.Replace(fullPathRoomText, "Full bathrooms", "", -1)
+			fullPathRoomText = strings.Replace(fullPathRoomText, ":", "", -1)
+			fullPathRoomText = util2.RemoveSpecialCharacters(fullPathRoomText)
+			fullPathRoomText = strings.TrimSpace(fullPathRoomText)
+			if fullPathRoomText != "" {
+				zillowData.FullBathrooms, err = strconv.Atoi(strings.TrimSpace(fullPathRoomText))
+				if err != nil {
+					log.Fatalln(err)
+				}
+			}
+
+		}
+	}
+
+	// Half Bathrooms
+	if zillowData.HalfBathrooms == 0 {
+		halfPathRoom := htmlquery.FindOne(doc, "//h6[contains(text(), \"Bedrooms and bathrooms\")]/following-sibling::ul//span[contains(text(), \"Bathrooms\")]")
+		if halfPathRoom != nil {
+			halfPathRoomText := htmlquery.InnerText(halfPathRoom)
+			halfPathRoomText = strings.Replace(halfPathRoomText, "Bathrooms", "", -1)
+			halfPathRoomText = strings.Replace(halfPathRoomText, ":", "", -1)
+			halfPathRoomText = util2.RemoveSpecialCharacters(halfPathRoomText)
+			halfPathRoomText = strings.TrimSpace(halfPathRoomText)
+			if halfPathRoomText != "" {
+				zillowData.HalfBathrooms, err = strconv.Atoi(halfPathRoomText)
+				if err != nil {
+					log.Fatalln(err)
+				}
+			}
+
+		}
+	}
+
+	// sale price
+	if zillowData.SalesPrice == 0 {
+		salePrice := htmlquery.FindOne(doc, "//span[@data-testid=\"price\"]/span/text()")
+		if salePrice == nil {
+			salePrice = htmlquery.FindOne(doc, "//*[contains(text(), \"Estimated sale price\")]/following-sibling::p/text()")
+		}
+		if salePrice != nil {
+			salePriceStr := strings.Replace(salePrice.Data, "$", "", -1)
+			salePriceStr = strings.Replace(salePriceStr, ",", ".", -1)
+			salePriceStr = util2.RemoveSpecialCharacters(salePriceStr)
+			salePriceStr = strings.TrimSpace(salePriceStr)
+			if salePriceStr != "" {
+				if zillowData.SalesPrice, err = strconv.ParseFloat(salePriceStr, 64); err != nil {
+					log.Fatalln(err)
+				}
+			}
+
+		}
+
+	}
+
+	// Rent Zestimate
+	if zillowData.RentZestimate == 0 || zillowData.Zestimate == 0 {
+		zestimates := htmlquery.Find(doc, "//*[contains(text(), \"Zestimate\")]/following-sibling::span/span/text()")
+		if zestimates != nil {
+			zestimateStr := strings.Replace(zestimates[0].Data, "$", "", -1)
+			zestimateStr = strings.Replace(zestimateStr, ",", ".", -1)
+			zestimateStr = util2.RemoveSpecialCharacters(zestimateStr)
+			zestimateStr = strings.TrimSpace(zestimateStr)
+			if zestimateStr != "" {
+				if zillowData.Zestimate, err = strconv.ParseFloat(zestimateStr, 64); err != nil {
+					log.Fatalln(err)
+				}
+			}
+
+			if len(zestimates) > 1 {
+				rentZestimateStr := strings.Replace(zestimates[1].Data, "$", "", -1)
+				rentZestimateStr = strings.Replace(rentZestimateStr, ",", ".", -1)
+				rentZestimateStr = util2.RemoveSpecialCharacters(rentZestimateStr)
+				rentZestimateStr = strings.TrimSpace(rentZestimateStr)
+				if rentZestimateStr != "" {
+					if zillowData.RentZestimate, err = strconv.ParseFloat(rentZestimateStr, 64); err != nil {
+						log.Fatalln(err)
+					}
+				}
+
+			}
+
 		}
 	}
 
@@ -286,10 +433,13 @@ func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
 
 	// Pictures
 	pictures := htmlquery.Find(doc, "//*[contains(@class, \"media-stream-tile\")]//img")
+
 	if pictures != nil {
+		var picSlice []string
 		for _, pic := range pictures {
-			zillowData.Pictures = append(zillowData.Pictures, htmlquery.SelectAttr(pic, "src"))
+			picSlice = append(picSlice, htmlquery.SelectAttr(pic, "src"))
 		}
+		zillowData.Pictures = strings.Join(picSlice, ", ")
 	}
 
 	// Time On Zillow
@@ -301,19 +451,27 @@ func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
 	// Views
 	views := htmlquery.FindOne(doc, "//dt/button[contains(text(), \"Views\") ]/parent::dt/following-sibling::dd/strong/text()")
 	if views != nil {
-		viewsData := strings.TrimSpace(views.Data)
-		if zillowData.Views, err = strconv.Atoi(viewsData); err != nil {
-			log.Fatalln(err)
+		viewsData := util2.RemoveSpecialCharacters(views.Data)
+		viewsData = strings.TrimSpace(viewsData)
+		if viewsData != "" {
+			if zillowData.Views, err = strconv.Atoi(viewsData); err != nil {
+				log.Fatalln(err)
+			}
 		}
+
 	}
 
 	// Saves
 	saves := htmlquery.FindOne(doc, "//dt/button[contains(text(), \"Saves\") ]/parent::dt/following-sibling::dd/strong/text()")
 	if saves != nil {
-		savesData := strings.TrimSpace(saves.Data)
-		if zillowData.Saves, err = strconv.Atoi(savesData); err != nil {
-			log.Fatalln(err)
+		savesData := util2.RemoveSpecialCharacters(saves.Data)
+		savesData = strings.TrimSpace(savesData)
+		if savesData != "" {
+			if zillowData.Saves, err = strconv.Atoi(savesData); err != nil {
+				log.Fatalln(err)
+			}
 		}
+
 	}
 
 	// Overview
@@ -338,15 +496,16 @@ func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
 	if dataUploadedDate != nil {
 		zillowData.DataUploadedDate = strings.TrimSpace(strings.Replace(dataUploadedDate.Data, "Data updated:", "", -1))
 	}
-	// Listed By
+	//Listed By
 	listBy := htmlquery.Find(doc, "//*[contains(text(), \"Listed by:\")]/following-sibling::span/p/text()")
 	if listBy != nil {
+		var listBySlice []string
 		for _, listByValue := range listBy {
 			if listByValue.Data != "" {
-				zillowData.ListedBy = append(zillowData.ListedBy, listByValue.Data)
+				listBySlice = append(listBySlice, listByValue.Data)
 			}
-
 		}
+		zillowData.ListedBy = strings.Join(listBySlice, "| ")
 	}
 
 	// Source
@@ -694,6 +853,9 @@ func (zc *ZillowCrawler) ParseData(source string, zillowData *ZillowData) {
 	// Data Source
 	dataSource := htmlquery.FindOne(doc, "//*[contains(text(), \"Find assessor info on the\")]/a/@href")
 	if dataSource != nil {
-		zillowData.DataSource = dataSource.Data
+		zillowData.DataSource = htmlquery.SelectAttr(dataSource, "href")
 	}
+	zillowData.Maindb3ID = zc.Maindb3.ID
+
+	return zillowData
 }

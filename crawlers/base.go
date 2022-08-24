@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/spf13/viper"
 	"log"
 	"multilogin_scraping/pkg/utils"
 	"net/http"
@@ -28,9 +29,8 @@ func NewBaseSelenium() *BaseSelenium {
 	return &BaseSelenium{}
 }
 
-const mla_url string = "http://127.0.0.1:35000/api/v1/profile/start?automation=true&profileId="
-const createProfileURL string = "http://127.0.0.1:35000/api/v2/profile"
-const deleteProfileURL string = "http://127.0.0.1:35000/api/v2/profile"
+var mla_url string = "/api/v1/profile/start?automation=true&profileId="
+var profileURL string = "/api/v2/profile/"
 
 func (ps *Profile) CreateProfile() {
 	oses := []string{"win", "mac", "android", "lin"}
@@ -46,8 +46,9 @@ func (ps *Profile) CreateProfile() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	resp, err := http.Post(createProfileURL, "application/json", bytes.NewBuffer(jsonData))
+	time.Sleep(time.Second * 5)
+	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), profileURL)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 
 	defer resp.Body.Close()
 
@@ -63,7 +64,8 @@ func (ps *Profile) CreateProfile() {
 
 // FetchProfile to get URL for remoting
 func (ps *Profile) FetchProfile() {
-	url := fmt.Sprint(mla_url, ps.UUID)
+	time.Sleep(time.Second * 5)
+	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), mla_url, ps.UUID)
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Fatalln(err)
@@ -71,13 +73,15 @@ func (ps *Profile) FetchProfile() {
 	defer resp.Body.Close()
 
 	// Decode data
+
 	if err := json.NewDecoder(resp.Body).Decode(ps); err != nil {
 		log.Fatalln(err)
 	}
 }
 
 func (ps *Profile) DeleteProfile() {
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprint(deleteProfileURL, "/", ps.UUID), nil)
+	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), profileURL, ps.UUID)
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -89,6 +93,10 @@ func (ps *Profile) DeleteProfile() {
 func (bs *BaseSelenium) StartSelenium(profileName string) *BaseSelenium {
 	ps := &Profile{Name: profileName}
 	ps.CreateProfile()
+	if ps.UUID == "" {
+		fmt.Println("ZillowCrawler Error:", ps.Value)
+		return nil
+	}
 	ps.FetchProfile()
 	selenium.SetDebug(true)
 	caps := selenium.Capabilities{}
@@ -98,6 +106,7 @@ func (bs *BaseSelenium) StartSelenium(profileName string) *BaseSelenium {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
 	bs.WebDriver = wd
 	bs.Profile = ps
 	return bs

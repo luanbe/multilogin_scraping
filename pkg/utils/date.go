@@ -1,13 +1,14 @@
 package util
 
 import (
+	"github.com/spf13/viper"
 	"time"
 )
 
 var (
 	LayoutDefault  = "2006-01-02 15:04:05"
 	LayoutDateOnly = "2006-01-02"
-	Loc, _         = time.LoadLocation("Asia/Jakarta")
+	Loc, _         = time.LoadLocation(viper.GetString("server.location"))
 )
 
 func DateRangeValidation(dateStart, dateEnd string) (validDate, validRange bool) {

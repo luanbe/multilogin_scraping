@@ -8,6 +8,7 @@ import (
 	"log"
 	"multilogin_scraping/app/models/entity"
 	"multilogin_scraping/app/registry"
+	"multilogin_scraping/app/service"
 	"multilogin_scraping/crawlers/zillow"
 	"multilogin_scraping/initialization"
 	"net/http"
@@ -51,19 +52,26 @@ func main() {
 func RunCrawler(db *gorm.DB) {
 	c := colly.NewCollector()
 
-	zillowService := registry.RegisterMaindb3Service(db)
-	maindb3List := zillowService.ListMaindb3Data(
-		viper.GetString("crawler.zillow_crawler.crawling_succeed_status"),
+	maindb3Service := registry.RegisterMaindb3Service(db)
+	zillowService := registry.RegisterZillowService(db)
+	maindb3List := maindb3Service.ListMaindb3Data(
+		viper.GetString("crawler.crawler_status.succeeded"),
 		viper.GetInt("crawler.zillow_crawler.concurrent"),
 	)
+	if len(maindb3List) > 0 {
+		defer fmt.Println("ZillowCrawler: Crawled Done")
+	}
 	for _, maindb3 := range maindb3List {
-		go RunZillowCrawler(c, maindb3)
+		RunZillowCrawler(c, maindb3, zillowService, maindb3Service)
 	}
 
 }
 
-func RunZillowCrawler(c *colly.Collector, maindb3 *entity.Maindb3) {
+func RunZillowCrawler(c *colly.Collector, maindb3 *entity.Maindb3, zillowService service.ZillowService, maindb3Service service.Maindb3Service) {
 	cZillow := c.Clone()
-	zillowCrawler := zillow.NewZillowCrawler(cZillow, maindb3)
+	zillowCrawler := zillow.NewZillowCrawler(cZillow, maindb3, zillowService, maindb3Service)
+	if zillowCrawler == nil {
+		return
+	}
 	zillowCrawler.RunZillowCrawler(true)
 }
