@@ -3,7 +3,6 @@ package zillow
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/viper"
 	"log"
 	"multilogin_scraping/app/service"
 	"multilogin_scraping/crawlers"
@@ -12,10 +11,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/icrowley/fake"
+	"github.com/spf13/viper"
+
+	"multilogin_scraping/app/models/entity"
+
 	"github.com/antchfx/htmlquery"
 	"github.com/gocolly/colly"
 	"github.com/tebeka/selenium"
-	"multilogin_scraping/app/models/entity"
 )
 
 type ZillowCrawler struct {
@@ -39,6 +42,9 @@ func NewZillowCrawler(c *colly.Collector, maindb3 *entity.Maindb3, zillowService
 	userAgent, err := BaseSel.WebDriver.ExecuteScript("return navigator.userAgent", nil)
 	if err != nil {
 		log.Fatalln(err)
+	}
+	if userAgent == nil {
+		userAgent = fake.UserAgent()
 	}
 	c.UserAgent = userAgent.(string)
 	return &ZillowCrawler{WebDriver: BaseSel.WebDriver, BaseSel: BaseSel, Profile: BaseSel.Profile, CZillow: c, Maindb3: maindb3, ZillowService: zillowService, Maindb3Service: maindb3Service}

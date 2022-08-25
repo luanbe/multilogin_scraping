@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/spf13/viper"
 	"log"
-	"multilogin_scraping/pkg/utils"
+	util "multilogin_scraping/pkg/utils"
 	"net/http"
 	"time"
+
+	"github.com/spf13/viper"
 
 	"github.com/tebeka/selenium"
 )
@@ -63,20 +64,23 @@ func (ps *Profile) CreateProfile() {
 }
 
 // FetchProfile to get URL for remoting
-func (ps *Profile) FetchProfile() {
+func (ps *Profile) FetchProfile() *Profile {
 	time.Sleep(time.Second * 5)
 	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), mla_url, ps.UUID)
 	resp, err := http.Get(url)
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println("ZillowCrawler Error: ", err)
+		return nil
 	}
 	defer resp.Body.Close()
 
 	// Decode data
 
 	if err := json.NewDecoder(resp.Body).Decode(ps); err != nil {
-		log.Fatalln(err)
+		fmt.Println("ZillowCrawler Error: ", err)
+		return nil
 	}
+	return ps
 }
 
 func (ps *Profile) DeleteProfile() {
@@ -98,13 +102,14 @@ func (bs *BaseSelenium) StartSelenium(profileName string) *BaseSelenium {
 		return nil
 	}
 	ps.FetchProfile()
-	selenium.SetDebug(true)
+	selenium.SetDebug(viper.GetBool("crawler.debug"))
 	caps := selenium.Capabilities{}
 
 	// Connect to Selenium
 	wd, err := selenium.NewRemote(caps, ps.Value)
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println("ZillowCrawler Error: ", err)
+		return nil
 	}
 
 	bs.WebDriver = wd
