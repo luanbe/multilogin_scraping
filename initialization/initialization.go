@@ -2,7 +2,10 @@ package initialization
 
 import (
 	"encoding/gob"
+	"encoding/json"
+	"fmt"
 	"github.com/alexedwards/scs/v2"
+	"go.uber.org/zap"
 	"net/http"
 	"time"
 
@@ -40,6 +43,26 @@ func InitDb() (*gorm.DB, error) {
 	//seedingPredefined(db, logger)
 
 	return db, nil
+}
+
+func InitLogger() *zap.Logger {
+	rawJSON := []byte(fmt.Sprintf(`{
+	  "level": "%s",
+	  "encoding": "json",
+	  "outputPaths": ["stdout"],
+	  "errorOutputPaths": ["stderr", "%s"],
+	  "encoderConfig": {
+	    "messageKey": "message",
+	    "levelKey": "level",
+	    "levelEncoder": "lowercase"
+	  }
+	}`, viper.GetString("crawler.logger_level"), viper.GetString("crawler.log_file")))
+
+	var cfg zap.Config
+	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
+		panic(err)
+	}
+	return zap.Must(cfg.Build())
 }
 
 // IntSessionManager function create session manager and int configuration

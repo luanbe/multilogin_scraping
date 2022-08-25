@@ -34,15 +34,19 @@ func main() {
 		panic(err.Error())
 	}
 
+	// Init Logger
+	logger := initialization.InitLogger()
+	defer logger.Sync()
+
 	// Int Session Manager
 	sessionManager := initialization.IntSessionManager()
 
 	// Int Router
 	router := initialization.InitRouting(db, sessionManager)
 
-	RunCrawler(db)
+	//RunCrawler(db)
 
-	fmt.Printf("Server START on port%v\n", viper.GetString("server.address"))
+	logger.Info(fmt.Sprintf("Server START on port%v", viper.GetString("server.address")))
 	log.Fatal(http.ListenAndServe(
 		viper.GetString("server.address"),
 		sessionManager.LoadAndSave(router),
