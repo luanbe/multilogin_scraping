@@ -1,14 +1,13 @@
 package service
 
 import (
-	"log"
 	"multilogin_scraping/app/models/entity"
 	"multilogin_scraping/app/repository"
 )
 
 type Maindb3Service interface {
-	ListMaindb3Data(crawlingStatus string, limit int) []*entity.Maindb3
-	UpdateStatus(maindb3 *entity.Maindb3, status string)
+	ListMaindb3Data(crawlingStatus string, limit int) ([]*entity.Maindb3, error)
+	UpdateStatus(maindb3 *entity.Maindb3, status string) error
 }
 
 type Maindb3ServiceImpl struct {
@@ -25,17 +24,18 @@ func NewMaindb3Service(
 	return &Maindb3ServiceImpl{baseRepo, maindb3Repo}
 }
 
-func (s *Maindb3ServiceImpl) ListMaindb3Data(crawlingStatus string, limit int) []*entity.Maindb3 {
+func (s *Maindb3ServiceImpl) ListMaindb3Data(crawlingStatus string, limit int) ([]*entity.Maindb3, error) {
 	//s.baseRepo.BeginTx()
 	result, err := s.maindb3Repo.ListMaindb3(crawlingStatus, limit)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
-	return result
+	return result, nil
 }
 
-func (s *Maindb3ServiceImpl) UpdateStatus(maindb3 *entity.Maindb3, status string) {
+func (s *Maindb3ServiceImpl) UpdateStatus(maindb3 *entity.Maindb3, status string) error {
 	if err := s.maindb3Repo.UpdateMaindb3(maindb3, map[string]interface{}{"crawling_status": status}); err != nil {
-		log.Fatalln(err)
+		return err
 	}
+	return nil
 }

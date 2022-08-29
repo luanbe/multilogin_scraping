@@ -3,6 +3,7 @@ package zillow
 import (
 	"encoding/json"
 	"fmt"
+	"go.uber.org/zap"
 	"log"
 	"multilogin_scraping/app/service"
 	"multilogin_scraping/crawlers"
@@ -22,44 +23,70 @@ import (
 )
 
 type ZillowCrawler struct {
-	WebDriver      selenium.WebDriver
-	BaseSel        *crawlers.BaseSelenium
-	Profile        *crawlers.Profile
-	CZillow        *colly.Collector
-	SearchPageReq  *SearchPageReq
-	Maindb3        *entity.Maindb3
+	WebDriver       selenium.WebDriver
+	BaseSel         *crawlers.BaseSelenium
+	Profile         *crawlers.Profile
+	CZillow         *colly.Collector
+	SearchPageReq   *SearchPageReq
+	CrawlerTables   *CrawlerTables
+	CrawlerServices CrawlerServices
+	Logger          *zap.Logger
+}
+
+type CrawlerTables struct {
+	Maindb3    *entity.Maindb3
+	ZillowData *entity.ZillowData
+	//ZillowData *entry.ZillowData
+}
+
+type CrawlerServices struct {
 	ZillowService  service.ZillowService
 	Maindb3Service service.Maindb3Service
 }
 
 const searchURL = "https://www.zillow.com/search/GetSearchPageState.htm?searchQueryState=%s&wants={\"cat1\":[\"listResults\",\"mapResults\"],\"cat2\":[\"total\"],\"regionResults\":[\"total\"]}&requestId=5"
 
-func NewZillowCrawler(c *colly.Collector, maindb3 *entity.Maindb3, zillowService service.ZillowService, maindb3Service service.Maindb3Service) *ZillowCrawler {
+func NewZillowCrawler(
+	c *colly.Collector,
+	maindb3 *entity.Maindb3,
+	zillowService service.ZillowService,
+	maindb3Service service.Maindb3Service,
+	logger *zap.Logger,
+) (*ZillowCrawler, error) {
 	BaseSel := crawlers.NewBaseSelenium()
-	if baseSelenium := BaseSel.StartSelenium("zillow"); baseSelenium == nil {
-		return nil
+	if err := BaseSel.StartSelenium("zillow"); err != nil {
+		return nil, err
 	}
 	userAgent, err := BaseSel.WebDriver.ExecuteScript("return navigator.userAgent", nil)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 	if userAgent == nil {
 		userAgent = fake.UserAgent()
 	}
 	c.UserAgent = userAgent.(string)
-	return &ZillowCrawler{WebDriver: BaseSel.WebDriver, BaseSel: BaseSel, Profile: BaseSel.Profile, CZillow: c, Maindb3: maindb3, ZillowService: zillowService, Maindb3Service: maindb3Service}
+
+	return &ZillowCrawler{
+		WebDriver:       BaseSel.WebDriver,
+		BaseSel:         BaseSel,
+		Profile:         BaseSel.Profile,
+		CZillow:         c,
+		CrawlerTables:   &CrawlerTables{maindb3, &entity.ZillowData{}},
+		CrawlerServices: CrawlerServices{zillowService, maindb3Service},
+		Logger:          logger,
+	}, nil
 }
 
-func (zc *ZillowCrawler) RunZillowCrawler(exactAddress bool) {
+func (zc *ZillowCrawler) RunZillowCrawler(exactAddress bool) error {
 	defer zc.BaseSel.StopSelenium()
 	// Crawling exact address
 	if exactAddress == true {
-		address := fmt.Sprint(strings.TrimSpace(zc.Maindb3.OwnerAddress), ", ", zc.Maindb3.OwnerCityState)
+		address := fmt.Sprint(strings.TrimSpace(zc.CrawlerTables.Maindb3.OwnerAddress), ", ", zc.CrawlerTables.Maindb3.OwnerCityState)
 		address = strings.Replace(address, " ", "-", -1)
 		url := fmt.Sprint("https://www.zillow.com/homes/", address, "_rb/")
-		zillowData := &entity.ZillowData{}
-		zc.CrawlAddress(url, zillowData)
-		return
+		if err := zc.CrawlAddress(url); err != nil {
+			return err
+		}
 	}
 	// defer zc.BaseSel.StopSelenium()
 	//if err := zc.WebDriver.Get(url); err != nil {
@@ -72,13 +99,14 @@ func (zc *ZillowCrawler) RunZillowCrawler(exactAddress bool) {
 	//zc.CheckVerifyHuman(pageSource)
 	//zc.CrawlData(zc.CrawlMapBounds(pageSource))
 	//fmt.Println(zc.WebDriver.GetCookies())
+	return nil
 }
 
-func (zc *ZillowCrawler) CheckVerifyHuman(pageSource string) {
+func (zc *ZillowCrawler) CheckVerifyHuman(pageSource string) error {
 	if strings.Contains(pageSource, "Please verify you're a human to continue") {
-		zc.BaseSel.StopSelenium()
-		log.Fatalln("the website blocked Zillow Crawler")
+		return fmt.Errorf("the website blocked crawler")
 	}
+	return nil
 }
 
 func (zc *ZillowCrawler) CrawlData(mapBounds MapBounds) {
@@ -206,42 +234,52 @@ func (zc *ZillowCrawler) CollectionData(result SearchPageResResult) {
 	zc.CrawlAddress(zillowData.URL, zillowData)
 }
 
-func (zc *ZillowCrawler) CrawlAddress(address string, zillowData *entity.ZillowData) {
+func (zc *ZillowCrawler) CrawlAddress(address string) error {
 	if err := zc.WebDriver.Get(address); err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	// NOTE: time to load source. Need to increase if data was not showing
 	time.Sleep(10 * time.Second)
 	pageSource, err := zc.WebDriver.PageSource()
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
-	zc.CheckVerifyHuman(pageSource)
-	zc.ParseData(pageSource, zillowData)
-	zc.UpdateDB(zillowData)
-	fmt.Println("ZillowCrawler: Crawled ", zillowData.URL)
-
-	time.Sleep(3 * time.Second)
+	if err := zc.CheckVerifyHuman(pageSource); err != nil {
+		return err
+	}
+	if err := zc.ParseData(pageSource); err != nil {
+		return err
+	}
+	if err := zc.UpdateDB(); err != nil {
+		return err
+	}
+	zc.Logger.Info(fmt.Sprint("ZillowCrawler: Crawled ", zillowData.URL))
+	return nil
 }
 
-func (zc *ZillowCrawler) UpdateDB(zillowData *entity.ZillowData) {
-	zc.ZillowService.AddZillow(zillowData)
-	zc.Maindb3Service.UpdateStatus(zc.Maindb3, viper.GetString("crawler.crawler_status.succeeded"))
+func (zc *ZillowCrawler) UpdateDB() error {
+
+	if err := zc.CrawlerServices.ZillowService.AddZillow(zc.CrawlerTables.ZillowData); err != nil {
+		return err
+	}
+
+	if err := zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerTables.Maindb3, viper.GetString("crawler.crawler_status.succeeded")); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (zc *ZillowCrawler) ParseData(source string, zillowData *entity.ZillowData) *entity.ZillowData {
+func (zc *ZillowCrawler) ParseData(source string) error {
 	//htmlquery.DisableSelectorCache = true
 	doc, err := htmlquery.Parse(strings.NewReader(source))
 
 	if err != nil {
-		log.Fatalln(err)
-	}
-	if zillowData.URL == "" {
-		if zillowData.URL, err = zc.BaseSel.WebDriver.CurrentURL(); err != nil {
-			log.Fatalln(err)
-		}
+		return err
 	}
 
+	if err := zc.ParseURL(); err != nil {
+		return err
+	}
 	// bed path SF
 	if zillowData.Bed == 0 || zillowData.Bath == 0 {
 		bedPathItems := htmlquery.Find(doc, "//span[contains(@data-testid,\"bed-bath\")]/span | //span[contains(@data-testid,\"bed-bath\")]/button")
@@ -863,5 +901,17 @@ func (zc *ZillowCrawler) ParseData(source string, zillowData *entity.ZillowData)
 	}
 	zillowData.Maindb3ID = zc.Maindb3.ID
 
-	return zillowData
+	return nil
+}
+
+func (zc *ZillowCrawler) ParseURL() error {
+	if zc.CrawlerTables.ZillowData.URL == "" {
+		url, err := zc.BaseSel.WebDriver.CurrentURL()
+		if err != nil {
+			return err
+		}
+		zc.CrawlerTables.ZillowData.URL = url
+	}
+	return nil
+
 }

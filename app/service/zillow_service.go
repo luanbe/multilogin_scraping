@@ -1,13 +1,12 @@
 package service
 
 import (
-	"log"
 	"multilogin_scraping/app/models/entity"
 	"multilogin_scraping/app/repository"
 )
 
 type ZillowService interface {
-	AddZillow(zillowData *entity.ZillowData)
+	AddZillow(zillowData *entity.ZillowData) error
 }
 
 type ZillowServiceImpl struct {
@@ -24,8 +23,9 @@ func NewZillowService(
 	return &ZillowServiceImpl{baseRepo, zillowRepo}
 }
 
-func (s *ZillowServiceImpl) AddZillow(zillowData *entity.ZillowData) {
+func (s *ZillowServiceImpl) AddZillow(zillowData *entity.ZillowData) error {
 	if err := s.zillowRepo.AddZillow(zillowData); err != nil {
-		log.Fatalln(err)
+		return err
 	}
+	return nil
 }

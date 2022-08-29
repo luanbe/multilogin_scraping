@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	util "multilogin_scraping/pkg/utils"
 	"net/http"
 	"time"
@@ -33,7 +32,7 @@ func NewBaseSelenium() *BaseSelenium {
 var mla_url string = "/api/v1/profile/start?automation=true&profileId="
 var profileURL string = "/api/v2/profile/"
 
-func (ps *Profile) CreateProfile() {
+func (ps *Profile) CreateProfile() error {
 	oses := []string{"win", "mac", "android", "lin"}
 	//browsers := []string{"stealthfox", "mimic"}
 	browsers := []string{"stealthfox"}
@@ -45,7 +44,7 @@ func (ps *Profile) CreateProfile() {
 	jsonData, err := json.Marshal(values)
 
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	time.Sleep(time.Second * 5)
 	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), profileURL)
@@ -54,70 +53,75 @@ func (ps *Profile) CreateProfile() {
 	defer resp.Body.Close()
 
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 
 	// Decode data
 	if err := json.NewDecoder(resp.Body).Decode(ps); err != nil {
-		log.Fatalln(err)
+		return err
 	}
+	return nil
 }
 
 // FetchProfile to get URL for remoting
-func (ps *Profile) FetchProfile() *Profile {
+func (ps *Profile) FetchProfile() error {
 	time.Sleep(time.Second * 5)
 	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), mla_url, ps.UUID)
 	resp, err := http.Get(url)
 	if err != nil {
-		fmt.Println("ZillowCrawler Error: ", err)
-		return nil
+		return err
 	}
 	defer resp.Body.Close()
 
 	// Decode data
-
 	if err := json.NewDecoder(resp.Body).Decode(ps); err != nil {
-		fmt.Println("ZillowCrawler Error: ", err)
-		return nil
+		return err
 	}
-	return ps
+	return nil
 }
 
-func (ps *Profile) DeleteProfile() {
+func (ps *Profile) DeleteProfile() error {
 	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), profileURL, ps.UUID)
 	req, err := http.NewRequest(http.MethodDelete, url, nil)
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	if _, err := http.DefaultClient.Do(req); err != nil {
-		log.Fatalln(err)
+		return err
 	}
 }
 
-func (bs *BaseSelenium) StartSelenium(profileName string) *BaseSelenium {
+func (bs *BaseSelenium) StartSelenium(profileName string) error {
 	ps := &Profile{Name: profileName}
-	ps.CreateProfile()
-	if ps.UUID == "" {
-		fmt.Println("ZillowCrawler Error:", ps.Value)
-		return nil
+	if err := ps.CreateProfile(); err != nil {
+		return err
 	}
-	ps.FetchProfile()
+	if ps.UUID == "" {
+		return fmt.Errorf(ps.Value)
+	}
+	if err := ps.FetchProfile(); err != nil {
+		return err
+	}
 	selenium.SetDebug(viper.GetBool("crawler.debug"))
 	caps := selenium.Capabilities{}
 
 	// Connect to Selenium
 	wd, err := selenium.NewRemote(caps, ps.Value)
 	if err != nil {
-		fmt.Println("ZillowCrawler Error: ", err)
-		return nil
+		return err
 	}
 
 	bs.WebDriver = wd
 	bs.Profile = ps
-	return bs
+	return nil
 }
-func (bs *BaseSelenium) StopSelenium() {
-	bs.WebDriver.Quit()
+func (bs *BaseSelenium) StopSelenium() error {
+	if err := bs.WebDriver.Quit(); err != nil {
+		return err
+	}
 	time.Sleep(3 * time.Second)
-	bs.Profile.DeleteProfile()
+	if err := bs.Profile.DeleteProfile(); err != nil {
+		return err
+	}
+	return nil
 }
