@@ -13,6 +13,7 @@ import (
 	"multilogin_scraping/crawlers/zillow"
 	"multilogin_scraping/initialization"
 	"net/http"
+	"sync"
 )
 
 func init() {
@@ -29,7 +30,10 @@ func init() {
 
 func main() {
 	// Init Logger
-	logger := initialization.InitLogger()
+	logger := initialization.InitLogger(
+		map[string]interface{}{"Logger": "System"},
+		"",
+	)
 	defer logger.Sync()
 
 	// Init Db connection
@@ -46,7 +50,7 @@ func main() {
 	// Int Router
 	router := initialization.InitRouting(db, sessionManager)
 
-	//RunCrawler(db)
+	RunCrawler(db)
 
 	logger.Info(fmt.Sprintf("Server START on port%v", viper.GetString("server.address")))
 	log.Fatal(http.ListenAndServe(
@@ -55,8 +59,13 @@ func main() {
 	))
 
 }
-func RunCrawler(db *gorm.DB, logger *zap.Logger) {
+func RunCrawler(db *gorm.DB) {
 	c := colly.NewCollector()
+	zillowLogger := initialization.InitLogger(
+		map[string]interface{}{"Logger": "Zillow Crawler"},
+		viper.GetString("crawler.zillow_crawler.log_file"),
+	)
+	defer zillowLogger.Sync()
 
 	maindb3Service := registry.RegisterMaindb3Service(db)
 	zillowService := registry.RegisterZillowService(db)
@@ -65,18 +74,16 @@ func RunCrawler(db *gorm.DB, logger *zap.Logger) {
 		viper.GetInt("crawler.zillow_crawler.concurrent"),
 	)
 	if err != nil {
-		logger.Error(err.Error(), zap.String("Crawler", "Zillow"))
+		zillowLogger.Error(err.Error())
 		return
 	}
-	if len(maindb3List) > 0 {
-		defer logger.Info("ZillowCrawler: Crawled Done", zap.String("Crawler", "Zillow"))
-	}
+	var m sync.Mutex
 	for _, maindb3 := range maindb3List {
-		if err := RunZillowCrawler(c, maindb3, zillowService, maindb3Service, logger); err != nil {
-			logger.Error(err.Error(), zap.String("Crawler", "Zillow"))
-		}
+		go RunZillowCrawler(c, maindb3, zillowService, maindb3Service, zillowLogger, &m)
 	}
-
+	if len(maindb3List) > 0 {
+		defer zillowLogger.Info("Completed to crawl", zap.Int("No.Addresses", len(maindb3List)))
+	}
 }
 
 func RunZillowCrawler(
@@ -85,14 +92,20 @@ func RunZillowCrawler(
 	zillowService service.ZillowService,
 	maindb3Service service.Maindb3Service,
 	logger *zap.Logger,
-) error {
+	m *sync.Mutex,
+) {
 	cZillow := c.Clone()
+	m.Lock()
 	zillowCrawler, err := zillow.NewZillowCrawler(cZillow, maindb3, zillowService, maindb3Service, logger)
 	if err != nil {
-		return err
+		logger.Error(err.Error(), zap.Uint64("mainDBID", maindb3.ID))
+		m.Unlock()
+		return
 	}
+	m.Unlock()
+	zillowCrawler.ShowLogInfo("Zillow Data is crawling...")
 	if err := zillowCrawler.RunZillowCrawler(true); err != nil {
-		return err
+		zillowCrawler.ShowLogError(err.Error())
 	}
-	return nil
+	zillowCrawler.ShowLogInfo("Zillow Data Crawled!")
 }

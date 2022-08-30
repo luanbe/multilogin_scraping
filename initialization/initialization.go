@@ -19,6 +19,10 @@ import (
 	"multilogin_scraping/helper/database"
 )
 
+type LoggerImpl struct {
+	LogFilePath string
+}
+
 // TODO: add logger later
 func InitDb() (*gorm.DB, error) {
 	db, err := database.NewConnectionDB(
@@ -44,14 +48,22 @@ func InitDb() (*gorm.DB, error) {
 	return db, nil
 }
 
-func InitLogger() *zap.Logger {
+func InitLogger(InitFields map[string]interface{}, LogFilePath string) *zap.Logger {
 
 	cfg := zap.NewProductionConfig()
 	cfg.EncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 		enc.AppendString(t.Format("2006-01-02T15:04:05.000Z0700"))
 	}
+	if InitFields != nil {
+		cfg.InitialFields = InitFields
+	}
+
 	cfg.OutputPaths = []string{"stdout"}
-	cfg.ErrorOutputPaths = []string{"stderr", viper.GetString("crawler.log_file")}
+	cfg.ErrorOutputPaths = []string{"stdout", "stderr"}
+	if LogFilePath != "" {
+		cfg.ErrorOutputPaths = append(cfg.ErrorOutputPaths, LogFilePath)
+	}
+
 	logger, _ := cfg.Build()
 	return logger
 

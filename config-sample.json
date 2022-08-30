@@ -23,9 +23,10 @@
     "concurrent_crawlers": 4,
     "debug": false,
     "zillow_crawler": {
-      "concurrent": 500
+      "concurrent": 500,
+      "log_file": "./zillow_crawler.log"
     },
-    "multilogin_url": "http://localhost:35001",
+    "multilogin_url": "http://localhost:35000",
     "crawler_status": {
       "succeeded": "crawled",
       "failed": "failed",

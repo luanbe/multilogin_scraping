@@ -46,7 +46,6 @@ func (ps *Profile) CreateProfile() error {
 	if err != nil {
 		return err
 	}
-	time.Sleep(time.Second * 5)
 	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), profileURL)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 
@@ -65,7 +64,6 @@ func (ps *Profile) CreateProfile() error {
 
 // FetchProfile to get URL for remoting
 func (ps *Profile) FetchProfile() error {
-	time.Sleep(time.Second * 5)
 	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), mla_url, ps.UUID)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -89,6 +87,7 @@ func (ps *Profile) DeleteProfile() error {
 	if _, err := http.DefaultClient.Do(req); err != nil {
 		return err
 	}
+	return nil
 }
 
 func (bs *BaseSelenium) StartSelenium(profileName string) error {
@@ -102,6 +101,7 @@ func (bs *BaseSelenium) StartSelenium(profileName string) error {
 	if err := ps.FetchProfile(); err != nil {
 		return err
 	}
+	time.Sleep(3 * time.Second)
 	selenium.SetDebug(viper.GetBool("crawler.debug"))
 	caps := selenium.Capabilities{}
 
