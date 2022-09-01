@@ -291,241 +291,30 @@ func (zc *ZillowCrawler) ParseData(source string) error {
 
 	zc.ParseURL()
 	zc.ParseBedBathSF(doc)
+	zc.ParseAddress(doc)
+	zc.ParseFullBathroom(doc)
+	zc.ParseHalfBathroom(doc)
+	zc.ParseSalePrice(doc)
+	zc.ParseZestimate(doc)
+	zc.ParseEstPayment(doc)
+	zc.ParsePrincipalInterest(doc)
+	zc.ParseMortgageInsurance(doc)
+	zc.ParsePropertyTaxes(doc)
+	zc.ParseHomeInsurance(doc)
+	zc.ParseHoaFee(doc)
+	zc.ParseUtilities(doc)
+	zc.ParseEstimatedSalesRange(doc)
+	zc.ParsePictures(doc)
+	zc.ParseTimeOnZillow(doc)
+	zc.ParseViews(doc)
+	zc.ParseSaves(doc)
+	zc.ParseOverview(doc)
+	zc.ParseMSL(doc)
+	zc.ParseZillowCheckedDate(doc)
+	zc.ParseDataUploadedDate(doc)
+	zc.ParseListBy(doc)
+	zc.ParseSourceZillow(doc)
 
-	//// Property Status
-	//if zillowData.Bed > 0 || zillowData.Bath > 0 {
-	//	zillowData.PropertyStatus = true
-	//}
-	//
-	//// Address
-	//if zillowData.Address == "" {
-	//	addresses := htmlquery.Find(doc, "//h1/text()")
-	//	for _, v := range addresses {
-	//		zillowData.Address += v.Data
-	//	}
-	//}
-	//
-	//// Full Bathrooms
-	//if zillowData.FullBathrooms == 0 {
-	//	fullPathRoom := htmlquery.FindOne(doc, "//span[contains(text(), \"Full bathrooms\")]")
-	//	if fullPathRoom != nil {
-	//		fullPathRoomText := htmlquery.InnerText(fullPathRoom)
-	//		fullPathRoomText = strings.Replace(fullPathRoomText, "Full bathrooms", "", -1)
-	//		fullPathRoomText = strings.Replace(fullPathRoomText, ":", "", -1)
-	//		fullPathRoomText = util2.RemoveSpecialCharacters(fullPathRoomText)
-	//		fullPathRoomText = strings.TrimSpace(fullPathRoomText)
-	//		if fullPathRoomText != "" {
-	//			zillowData.FullBathrooms, err = strconv.Atoi(strings.TrimSpace(fullPathRoomText))
-	//			if err != nil {
-	//				log.Fatalln(err)
-	//			}
-	//		}
-	//
-	//	}
-	//}
-	//
-	//// Half Bathrooms
-	//if zillowData.HalfBathrooms == 0 {
-	//	halfPathRoom := htmlquery.FindOne(doc, "//h6[contains(text(), \"Bedrooms and bathrooms\")]/following-sibling::ul//span[contains(text(), \"Bathrooms\")]")
-	//	if halfPathRoom != nil {
-	//		halfPathRoomText := htmlquery.InnerText(halfPathRoom)
-	//		halfPathRoomText = strings.Replace(halfPathRoomText, "Bathrooms", "", -1)
-	//		halfPathRoomText = strings.Replace(halfPathRoomText, ":", "", -1)
-	//		halfPathRoomText = util2.RemoveSpecialCharacters(halfPathRoomText)
-	//		halfPathRoomText = strings.TrimSpace(halfPathRoomText)
-	//		if halfPathRoomText != "" {
-	//			zillowData.HalfBathrooms, err = strconv.Atoi(halfPathRoomText)
-	//			if err != nil {
-	//				log.Fatalln(err)
-	//			}
-	//		}
-	//
-	//	}
-	//}
-	//
-	//// sale price
-	//if zillowData.SalesPrice == 0 {
-	//	salePrice := htmlquery.FindOne(doc, "//span[@data-testid=\"price\"]/span/text()")
-	//	if salePrice == nil {
-	//		salePrice = htmlquery.FindOne(doc, "//*[contains(text(), \"Estimated sale price\")]/following-sibling::p/text()")
-	//	}
-	//	if salePrice != nil {
-	//		salePriceStr := strings.Replace(salePrice.Data, "$", "", -1)
-	//		salePriceStr = strings.Replace(salePriceStr, ",", ".", -1)
-	//		salePriceStr = util2.RemoveSpecialCharacters(salePriceStr)
-	//		salePriceStr = strings.TrimSpace(salePriceStr)
-	//		if salePriceStr != "" {
-	//			if zillowData.SalesPrice, err = strconv.ParseFloat(salePriceStr, 64); err != nil {
-	//				log.Fatalln(err)
-	//			}
-	//		}
-	//
-	//	}
-	//
-	//}
-	//
-	//// Rent Zestimate
-	//if zillowData.RentZestimate == 0 || zillowData.Zestimate == 0 {
-	//	zestimates := htmlquery.Find(doc, "//*[contains(text(), \"Zestimate\")]/following-sibling::span/span/text()")
-	//	if zestimates != nil {
-	//		zestimateStr := strings.Replace(zestimates[0].Data, "$", "", -1)
-	//		zestimateStr = strings.Replace(zestimateStr, ",", ".", -1)
-	//		zestimateStr = util2.RemoveSpecialCharacters(zestimateStr)
-	//		zestimateStr = strings.TrimSpace(zestimateStr)
-	//		if zestimateStr != "" {
-	//			if zillowData.Zestimate, err = strconv.ParseFloat(zestimateStr, 64); err != nil {
-	//				log.Fatalln(err)
-	//			}
-	//		}
-	//
-	//		if len(zestimates) > 1 {
-	//			rentZestimateStr := strings.Replace(zestimates[1].Data, "$", "", -1)
-	//			rentZestimateStr = strings.Replace(rentZestimateStr, ",", ".", -1)
-	//			rentZestimateStr = util2.RemoveSpecialCharacters(rentZestimateStr)
-	//			rentZestimateStr = strings.TrimSpace(rentZestimateStr)
-	//			if rentZestimateStr != "" {
-	//				if zillowData.RentZestimate, err = strconv.ParseFloat(rentZestimateStr, 64); err != nil {
-	//					log.Fatalln(err)
-	//				}
-	//			}
-	//
-	//		}
-	//
-	//	}
-	//}
-	//
-	//// Est. Payment
-	//estPayment := htmlquery.FindOne(doc, "//div[@class='summary-container']//span[contains(text(), 'Est. payment')]/following-sibling::span/text()")
-	//if estPayment != nil {
-	//	zillowData.EstPayment = strings.TrimSpace(estPayment.Data)
-	//}
-	//
-	//// Principal & Interest $
-	//principalInterest := htmlquery.FindOne(doc, "//h5[normalize-space(text())='Principal & interest']/following-sibling::span/text()")
-	//if principalInterest != nil {
-	//	zillowData.PrincipalInterest = strings.TrimSpace(principalInterest.Data)
-	//}
-	//// Mortgage Insurance $
-	//mortgageInsurance := htmlquery.FindOne(doc, "//h5[normalize-space(text())='Mortgage insurance']/following-sibling::span/text()")
-	//if mortgageInsurance != nil {
-	//	zillowData.MortgageInsurance = strings.TrimSpace(mortgageInsurance.Data)
-	//}
-	//
-	//// Property Taxes $
-	//propertyTaxes := htmlquery.FindOne(doc, "//h5[normalize-space(text())='Property taxes']/following-sibling::span/text()")
-	//if propertyTaxes != nil {
-	//	zillowData.PropertyTaxes = strings.TrimSpace(propertyTaxes.Data)
-	//}
-	//
-	//// Home Insurance $
-	//homeInsurance := htmlquery.FindOne(doc, "//h5[contains(text(), 'Home insurance')]/following-sibling::span/text()")
-	//if homeInsurance != nil {
-	//	zillowData.HomeInsurance = strings.TrimSpace(homeInsurance.Data)
-	//}
-	//
-	//// HOA Fees $
-	//hoaFees := htmlquery.FindOne(doc, "//h5[contains(text(), 'HOA fee')]/following-sibling::span/text()")
-	//if hoaFees != nil {
-	//	zillowData.HOAFee = strings.TrimSpace(hoaFees.Data)
-	//}
-	//
-	//// Utilities $
-	//utilities := htmlquery.FindOne(doc, "//h5[contains(text(), \"Utilities\")]/following-sibling::span/text()")
-	//if utilities != nil {
-	//	zillowData.Utilities = strings.TrimSpace(utilities.Data)
-	//}
-	//
-	//// Estimated Sales Range
-	//estimatedSalesRange := htmlquery.FindOne(doc, "//span[contains(text(), 'Estimated sales range')]/span/text()")
-	//if estimatedSalesRange != nil {
-	//	estimatedSalesRangeList := strings.Split(strings.TrimSpace(estimatedSalesRange.Data), "-")
-	//	zillowData.EstimatedSalesRangeMinimum = strings.TrimSpace(estimatedSalesRangeList[0])
-	//	zillowData.EstimatedSalesRangeMax = strings.TrimSpace(estimatedSalesRangeList[1])
-	//}
-	//
-	//// Pictures
-	//pictures := htmlquery.Find(doc, "//*[contains(@class, \"media-stream-tile\")]//img")
-	//
-	//if pictures != nil {
-	//	var picSlice []string
-	//	for _, pic := range pictures {
-	//		picSlice = append(picSlice, htmlquery.SelectAttr(pic, "src"))
-	//	}
-	//	zillowData.Pictures = strings.Join(picSlice, ", ")
-	//}
-	//
-	//// Time On Zillow
-	//timeOnZillow := htmlquery.FindOne(doc, "//dt[contains(text(), \"Time on Zillow\")]/following-sibling::dd/strong/text()")
-	//if timeOnZillow != nil {
-	//	zillowData.TimeOnZillow = strings.TrimSpace(timeOnZillow.Data)
-	//}
-	//
-	//// Views
-	//views := htmlquery.FindOne(doc, "//dt/button[contains(text(), \"Views\") ]/parent::dt/following-sibling::dd/strong/text()")
-	//if views != nil {
-	//	viewsData := util2.RemoveSpecialCharacters(views.Data)
-	//	viewsData = strings.TrimSpace(viewsData)
-	//	if viewsData != "" {
-	//		if zillowData.Views, err = strconv.Atoi(viewsData); err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//	}
-	//
-	//}
-	//
-	//// Saves
-	//saves := htmlquery.FindOne(doc, "//dt/button[contains(text(), \"Saves\") ]/parent::dt/following-sibling::dd/strong/text()")
-	//if saves != nil {
-	//	savesData := util2.RemoveSpecialCharacters(saves.Data)
-	//	savesData = strings.TrimSpace(savesData)
-	//	if savesData != "" {
-	//		if zillowData.Saves, err = strconv.Atoi(savesData); err != nil {
-	//			log.Fatalln(err)
-	//		}
-	//	}
-	//
-	//}
-	//
-	//// Overview
-	//overview := htmlquery.FindOne(doc, "//h4[contains(text(), \"Overview\")]/following-sibling::div//div[contains(@class, \"Spacer\")]//div[contains(@class, \"Text\")]/text()")
-	//if overview != nil {
-	//	zillowData.Overview = strings.TrimSpace(overview.Data)
-	//}
-	//// MLS
-	//mls := htmlquery.FindOne(doc, "//span[contains(text(), \"MLS#:\")]/text()")
-	//if mls != nil {
-	//	zillowData.MLS = strings.TrimSpace(strings.Replace(mls.Data, "MLS#:", "", -1))
-	//}
-	//
-	//// Zillow Checked Date
-	//zillowCheckedDate := htmlquery.FindOne(doc, "//*[contains(text(), \"Zillow checked:\")]/text()")
-	//if zillowCheckedDate != nil {
-	//	zillowData.ZillowCheckedDate = strings.TrimSpace(strings.Replace(zillowCheckedDate.Data, "Zillow checked:", "", -1))
-	//}
-	//
-	//// Data Uploaded Date
-	//dataUploadedDate := htmlquery.FindOne(doc, "//*[contains(text(), \"Data updated:\")]/text()")
-	//if dataUploadedDate != nil {
-	//	zillowData.DataUploadedDate = strings.TrimSpace(strings.Replace(dataUploadedDate.Data, "Data updated:", "", -1))
-	//}
-	////Listed By
-	//listBy := htmlquery.Find(doc, "//*[contains(text(), \"Listed by:\")]/following-sibling::span/p/text()")
-	//if listBy != nil {
-	//	var listBySlice []string
-	//	for _, listByValue := range listBy {
-	//		if listByValue.Data != "" {
-	//			listBySlice = append(listBySlice, listByValue.Data)
-	//		}
-	//	}
-	//	zillowData.ListedBy = strings.Join(listBySlice, "| ")
-	//}
-	//
-	//// Source
-	//sourceZillow := htmlquery.FindOne(doc, "//*[contains(text(), \"Source:\")]/text()")
-	//if sourceZillow != nil {
-	//	zillowData.Source = strings.TrimSpace(strings.Replace(sourceZillow.Data, "Source:", "", -1))
-	//}
-	//
 	//// Year Built
 	//yearBuilt := htmlquery.FindOne(doc, "//span[contains(text(), \"Year built\")]/text()")
 	//if yearBuilt != nil {
@@ -931,5 +720,294 @@ func (zc *ZillowCrawler) ParseBedBathSF(doc *html.Node) {
 				}
 			}
 		}
+	}
+
+	// Property Status
+	if zc.CrawlerTables.ZillowData.Bed > 0 || zc.CrawlerTables.ZillowData.Bath > 0 {
+		zc.CrawlerTables.ZillowData.PropertyStatus = true
+	}
+}
+
+func (zc *ZillowCrawler) ParseAddress(doc *html.Node) {
+	if zc.CrawlerTables.ZillowData.Address == "" {
+		addresses := htmlquery.Find(doc, "//h1/text()")
+		for _, v := range addresses {
+			zc.CrawlerTables.ZillowData.Address += v.Data
+		}
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseFullBathroom(doc *html.Node) {
+	// Full Bathrooms
+	if zc.CrawlerTables.ZillowData.FullBathrooms == 0 {
+		fullPathRoom := htmlquery.FindOne(doc, "//span[contains(text(), \"Full bathrooms\")]")
+		if fullPathRoom != nil {
+			fullBathRoomText := htmlquery.InnerText(fullPathRoom)
+			fullBathRoomText = strings.Replace(fullBathRoomText, "Full bathrooms", "", -1)
+			fullBathRoomText = strings.Replace(fullBathRoomText, ":", "", -1)
+			fullBathRoomText = util2.RemoveSpecialCharacters(fullBathRoomText)
+			fullBathRoomText = strings.TrimSpace(fullBathRoomText)
+			if fullBathRoomText != "" {
+				fullBathRoomValue, err := strconv.Atoi(strings.TrimSpace(fullBathRoomText))
+				if err != nil {
+					zc.Logger.Error(err.Error())
+				} else {
+					zc.CrawlerTables.ZillowData.FullBathrooms = fullBathRoomValue
+				}
+			}
+		}
+	}
+}
+
+func (zc *ZillowCrawler) ParseHalfBathroom(doc *html.Node) {
+	if zc.CrawlerTables.ZillowData.HalfBathrooms == 0 {
+		halfPathRoom := htmlquery.FindOne(doc, "//h6[contains(text(), \"Bedrooms and bathrooms\")]/following-sibling::ul//span[contains(text(), \"Bathrooms\")]")
+		if halfPathRoom != nil {
+			halfPathRoomText := htmlquery.InnerText(halfPathRoom)
+			halfPathRoomText = strings.Replace(halfPathRoomText, "Bathrooms", "", -1)
+			halfPathRoomText = strings.Replace(halfPathRoomText, ":", "", -1)
+			halfPathRoomText = util2.RemoveSpecialCharacters(halfPathRoomText)
+			halfPathRoomText = strings.TrimSpace(halfPathRoomText)
+			if halfPathRoomText != "" {
+				halfBathRoomValue, err := strconv.Atoi(halfPathRoomText)
+				if err != nil {
+					zc.Logger.Error(err.Error())
+				} else {
+					zc.CrawlerTables.ZillowData.HalfBathrooms = halfBathRoomValue
+				}
+
+			}
+
+		}
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseSalePrice(doc *html.Node) {
+	if zc.CrawlerTables.ZillowData.SalesPrice == 0 {
+		salePrice := htmlquery.FindOne(doc, "//span[@data-testid=\"price\"]/span/text()")
+		if salePrice == nil {
+			salePrice = htmlquery.FindOne(doc, "//*[contains(text(), \"Estimated sale price\")]/following-sibling::p/text()")
+		}
+		if salePrice != nil {
+			salePriceStr := strings.Replace(salePrice.Data, "$", "", -1)
+			salePriceStr = strings.Replace(salePriceStr, ",", ".", -1)
+			salePriceStr = util2.RemoveSpecialCharacters(salePriceStr)
+			salePriceStr = strings.TrimSpace(salePriceStr)
+			if salePriceStr != "" {
+				salePrice, err := strconv.ParseFloat(salePriceStr, 64)
+				if err != nil {
+					zc.Logger.Error(err.Error())
+				} else {
+					zc.CrawlerTables.ZillowData.SalesPrice = salePrice
+				}
+			}
+		}
+
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseZestimate(doc *html.Node) {
+	if zc.CrawlerTables.ZillowData.RentZestimate == 0 || zc.CrawlerTables.ZillowData.Zestimate == 0 {
+		zestimates := htmlquery.Find(doc, "//*[contains(text(), \"Zestimate\")]/following-sibling::span/span/text()")
+		if zestimates != nil {
+			zestimateStr := strings.Replace(zestimates[0].Data, "$", "", -1)
+			zestimateStr = strings.Replace(zestimateStr, ",", ".", -1)
+			zestimateStr = util2.RemoveSpecialCharacters(zestimateStr)
+			zestimateStr = strings.TrimSpace(zestimateStr)
+			if zestimateStr != "" {
+				if zestimateValue, err := strconv.ParseFloat(zestimateStr, 64); err != nil {
+					zc.Logger.Error(err.Error())
+				} else {
+					zc.CrawlerTables.ZillowData.Zestimate = zestimateValue
+				}
+			}
+
+			if len(zestimates) > 1 {
+				rentZestimateStr := strings.Replace(zestimates[1].Data, "$", "", -1)
+				rentZestimateStr = strings.Replace(rentZestimateStr, ",", ".", -1)
+				rentZestimateStr = util2.RemoveSpecialCharacters(rentZestimateStr)
+				rentZestimateStr = strings.TrimSpace(rentZestimateStr)
+				if rentZestimateStr != "" {
+					if rentZestimateValue, err := strconv.ParseFloat(rentZestimateStr, 64); err != nil {
+						zc.Logger.Error(err.Error())
+					} else {
+						zc.CrawlerTables.ZillowData.RentZestimate = rentZestimateValue
+					}
+				}
+
+			}
+
+		}
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseEstPayment(doc *html.Node) {
+	estPayment := htmlquery.FindOne(doc, "//div[@class='summary-container']//span[contains(text(), 'Est. payment')]/following-sibling::span/text()")
+	if estPayment != nil {
+		zc.CrawlerTables.ZillowData.EstPayment = strings.TrimSpace(estPayment.Data)
+	}
+
+}
+
+func (zc *ZillowCrawler) ParsePrincipalInterest(doc *html.Node) {
+	principalInterest := htmlquery.FindOne(doc, "//h5[normalize-space(text())='Principal & interest']/following-sibling::span/text()")
+	if principalInterest != nil {
+		zc.CrawlerTables.ZillowData.PrincipalInterest = strings.TrimSpace(principalInterest.Data)
+	}
+}
+
+func (zc *ZillowCrawler) ParseMortgageInsurance(doc *html.Node) {
+	mortgageInsurance := htmlquery.FindOne(doc, "//h5[normalize-space(text())='Mortgage insurance']/following-sibling::span/text()")
+	if mortgageInsurance != nil {
+		zc.CrawlerTables.ZillowData.MortgageInsurance = strings.TrimSpace(mortgageInsurance.Data)
+	}
+
+}
+
+func (zc *ZillowCrawler) ParsePropertyTaxes(doc *html.Node) {
+	propertyTaxes := htmlquery.FindOne(doc, "//h5[normalize-space(text())='Property taxes']/following-sibling::span/text()")
+	if propertyTaxes != nil {
+		zc.CrawlerTables.ZillowData.PropertyTaxes = strings.TrimSpace(propertyTaxes.Data)
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseHomeInsurance(doc *html.Node) {
+	homeInsurance := htmlquery.FindOne(doc, "//h5[contains(text(), 'Home insurance')]/following-sibling::span/text()")
+	if homeInsurance != nil {
+		zc.CrawlerTables.ZillowData.HomeInsurance = strings.TrimSpace(homeInsurance.Data)
+	}
+}
+
+func (zc *ZillowCrawler) ParseHoaFee(doc *html.Node) {
+	hoaFees := htmlquery.FindOne(doc, "//h5[contains(text(), 'HOA fee')]/following-sibling::span/text()")
+	if hoaFees != nil {
+		zc.CrawlerTables.ZillowData.HOAFee = strings.TrimSpace(hoaFees.Data)
+	}
+}
+
+func (zc *ZillowCrawler) ParseUtilities(doc *html.Node) {
+	utilities := htmlquery.FindOne(doc, "//h5[contains(text(), \"Utilities\")]/following-sibling::span/text()")
+	if utilities != nil {
+		zc.CrawlerTables.ZillowData.Utilities = strings.TrimSpace(utilities.Data)
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseEstimatedSalesRange(doc *html.Node) {
+	estimatedSalesRange := htmlquery.FindOne(doc, "//span[contains(text(), 'Estimated sales range')]/span/text()")
+	if estimatedSalesRange != nil {
+		estimatedSalesRangeList := strings.Split(strings.TrimSpace(estimatedSalesRange.Data), "-")
+		zc.CrawlerTables.ZillowData.EstimatedSalesRangeMinimum = strings.TrimSpace(estimatedSalesRangeList[0])
+		zc.CrawlerTables.ZillowData.EstimatedSalesRangeMax = strings.TrimSpace(estimatedSalesRangeList[1])
+	}
+
+}
+
+func (zc *ZillowCrawler) ParsePictures(doc *html.Node) {
+	pictures := htmlquery.Find(doc, "//*[contains(@class, \"media-stream-tile\")]//img")
+
+	if pictures != nil {
+		var picSlice []string
+		for _, pic := range pictures {
+			picSlice = append(picSlice, htmlquery.SelectAttr(pic, "src"))
+		}
+		zc.CrawlerTables.ZillowData.Pictures = strings.Join(picSlice, ", ")
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseTimeOnZillow(doc *html.Node) {
+	timeOnZillow := htmlquery.FindOne(doc, "//dt[contains(text(), \"Time on Zillow\")]/following-sibling::dd/strong/text()")
+	if timeOnZillow != nil {
+		zc.CrawlerTables.ZillowData.TimeOnZillow = strings.TrimSpace(timeOnZillow.Data)
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseViews(doc *html.Node) {
+	views := htmlquery.FindOne(doc, "//dt/button[contains(text(), \"Views\") ]/parent::dt/following-sibling::dd/strong/text()")
+	if views != nil {
+		viewsData := util2.RemoveSpecialCharacters(views.Data)
+		viewsData = strings.TrimSpace(viewsData)
+		if viewsData != "" {
+			if viewsValue, err := strconv.Atoi(viewsData); err != nil {
+				zc.Logger.Error(err.Error())
+			} else {
+				zc.CrawlerTables.ZillowData.Views = viewsValue
+			}
+		}
+
+	}
+}
+
+func (zc *ZillowCrawler) ParseSaves(doc *html.Node) {
+	saves := htmlquery.FindOne(doc, "//dt/button[contains(text(), \"Saves\") ]/parent::dt/following-sibling::dd/strong/text()")
+	if saves != nil {
+		savesData := util2.RemoveSpecialCharacters(saves.Data)
+		savesData = strings.TrimSpace(savesData)
+		if savesData != "" {
+			if savesValue, err := strconv.Atoi(savesData); err != nil {
+				zc.Logger.Error(err.Error())
+			} else {
+				zc.CrawlerTables.ZillowData.Saves = savesValue
+			}
+		}
+
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseOverview(doc *html.Node) {
+	overview := htmlquery.FindOne(doc, "//h4[contains(text(), \"Overview\")]/following-sibling::div//div[contains(@class, \"Spacer\")]//div[contains(@class, \"Text\")]/text()")
+	if overview != nil {
+		zc.CrawlerTables.ZillowData.Overview = strings.TrimSpace(overview.Data)
+	}
+}
+
+func (zc *ZillowCrawler) ParseMSL(doc *html.Node) {
+	mls := htmlquery.FindOne(doc, "//span[contains(text(), \"MLS#:\")]/text()")
+	if mls != nil {
+		zc.CrawlerTables.ZillowData.MLS = strings.TrimSpace(strings.Replace(mls.Data, "MLS#:", "", -1))
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseZillowCheckedDate(doc *html.Node) {
+	zillowCheckedDate := htmlquery.FindOne(doc, "//*[contains(text(), \"Zillow checked:\")]/text()")
+	if zillowCheckedDate != nil {
+		zc.CrawlerTables.ZillowData.ZillowCheckedDate = strings.TrimSpace(strings.Replace(zillowCheckedDate.Data, "Zillow checked:", "", -1))
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseDataUploadedDate(doc *html.Node) {
+	dataUploadedDate := htmlquery.FindOne(doc, "//*[contains(text(), \"Data updated:\")]/text()")
+	if dataUploadedDate != nil {
+		zc.CrawlerTables.ZillowData.DataUploadedDate = strings.TrimSpace(strings.Replace(dataUploadedDate.Data, "Data updated:", "", -1))
+	}
+}
+
+func (zc *ZillowCrawler) ParseListBy(doc *html.Node) {
+	listBy := htmlquery.Find(doc, "//*[contains(text(), \"Listed by:\")]/following-sibling::span/p/text()")
+	if listBy != nil {
+		var listBySlice []string
+		for _, listByValue := range listBy {
+			if listByValue.Data != "" {
+				listBySlice = append(listBySlice, listByValue.Data)
+			}
+		}
+		zc.CrawlerTables.ZillowData.ListedBy = strings.Join(listBySlice, "| ")
+	}
+}
+
+func (zc *ZillowCrawler) ParseSourceZillow(doc *html.Node) {
+	sourceZillow := htmlquery.FindOne(doc, "//*[contains(text(), \"Source:\")]/text()")
+	if sourceZillow != nil {
+		zc.CrawlerTables.ZillowData.Source = strings.TrimSpace(strings.Replace(sourceZillow.Data, "Source:", "", -1))
 	}
 }
