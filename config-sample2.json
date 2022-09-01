@@ -1,0 +1,36 @@
+{
+  "debug": true,
+  "server": {
+    "address": ":3000",
+    "location": "Asia/Jakarta"
+  },
+  "context": {
+    "timeout": 2
+  },
+  "database": {
+    "driver": "mysql",
+    "host": "localhost",
+    "port": 40000,
+    "username": "root",
+    "password": "crawler",
+    "dbname": "multilogin_crawler",
+    "debug": true
+  },
+  "session": {
+    "auth_user_key": "luabbe68"
+  },
+  "crawler": {
+    "concurrent_crawlers": 4,
+    "debug": false,
+    "zillow_crawler": {
+      "concurrent": 1,
+      "log_file": "./zillow_crawler.log"
+    },
+    "multilogin_url": "http://localhost:35000",
+    "crawler_status": {
+      "succeeded": "crawled",
+      "failed": "failed",
+      "rerun": "rerun"
+    }
+  }
+}
