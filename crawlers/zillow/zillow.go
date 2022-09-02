@@ -314,350 +314,35 @@ func (zc *ZillowCrawler) ParseData(source string) error {
 	zc.ParseDataUploadedDate(doc)
 	zc.ParseListBy(doc)
 	zc.ParseSourceZillow(doc)
-
-	//// Year Built
-	//yearBuilt := htmlquery.FindOne(doc, "//span[contains(text(), \"Year built\")]/text()")
-	//if yearBuilt != nil {
-	//	zillowData.YearBuilt = strings.TrimSpace(strings.Replace(yearBuilt.Data, "Year built:", "", -1))
-	//}
-	//
-	//// Natural Gas
-	//naturalGas := htmlquery.FindOne(doc, "//*[contains(text(), \"Natural Gas\") or contains(text(), \"natural gas\")]")
-	//if naturalGas != nil {
-	//	zillowData.NaturalGas = true
-	//}
-	//
-	//// Central Air
-	//centralAir := htmlquery.FindOne(doc, "//*[contains(text(), \"Central Air\") or contains(text(), \"central air\")]")
-	//if centralAir != nil {
-	//	zillowData.CentralAir = true
-	//}
-	//
-	//// # of Garage Spaces
-	//garageSpaces := htmlquery.FindOne(doc, "//*[contains(text(), \"garage spaces\")]/text()")
-	//if garageSpaces != nil {
-	//	zillowData.OfGarageSpaces = strings.TrimSpace(strings.Replace(garageSpaces.Data, " garage spaces", "", -1))
-	//}
-	//
-	//// HOA Amount
-	//hoaAmount := htmlquery.FindOne(doc, "//*[contains(text(), \"annually HOA fee\")]/text()")
-	//if hoaAmount != nil {
-	//	zillowData.HOAAmount = strings.TrimSpace(strings.Replace(hoaAmount.Data, " annually HOA fee", "", -1))
-	//}
-	//
-	//// Lot Size
-	//lotSizes := htmlquery.Find(doc, "//*[contains(text(), \"Lot size\")]/text()")
-	//if lotSizes != nil {
-	//	for _, v := range lotSizes {
-	//		lotSizeData := strings.TrimSpace(strings.Replace(v.Data, "Lot size:", "", -1))
-	//		if strings.Contains(lotSizeData, "sqft") == true {
-	//			zillowData.LotSizeSF = lotSizeData
-	//		}
-	//		if strings.Contains(lotSizeData, "Acres") == true {
-	//			zillowData.LotSizeAcres = lotSizeData
-	//		}
-	//	}
-	//
-	//}
-	//
-	//// Buyer's agent fee
-	//buyerAgentFee := htmlquery.FindOne(doc, "//*[contains(text(), \"buyer's agent fee\")]/text()")
-	//if buyerAgentFee != nil {
-	//	zillowData.BuyerAgentFee = strings.TrimSpace(strings.Replace(buyerAgentFee.Data, " buyer's agent fee", "", -1))
-	//}
-	//
-	//// Appliances
-	//applicances := htmlquery.FindOne(doc, "//*[contains(text(), \"Appliances included\")]")
-	//if applicances != nil {
-	//	zillowData.Appliances = strings.TrimSpace(strings.Replace(htmlquery.InnerText(applicances), "Appliances included:", "", -1))
-	//}
-	//
-	//// Living Room
-	//livingRooms := htmlquery.Find(doc, "//h6[contains(text(), \"LivingRoom\")]/following-sibling::ul")
-	//for _, livingroom := range livingRooms {
-	//	// Living Room Level
-	//	livingRoomLevel := htmlquery.FindOne(livingroom, ".//span[contains(text(), \"Level\")]")
-	//	if livingRoomLevel != nil {
-	//		zillowData.LivingRoomLevel = strings.TrimSpace(strings.Replace(htmlquery.InnerText(livingRoomLevel), "Level:", "", -1))
-	//	}
-	//
-	//	// Living Room Dimensions
-	//	livingRoomDimensions := htmlquery.FindOne(livingroom, ".//span[contains(text(), \"Dimensions\")]")
-	//	if livingRoomDimensions != nil {
-	//		zillowData.LivingRoomDimensions = strings.TrimSpace(strings.Replace(htmlquery.InnerText(livingRoomDimensions), "Dimensions:", "", -1))
-	//	}
-	//}
-	//
-	//// Primary Bedroom
-	//primaryBedRooms := htmlquery.Find(doc, "//h6[contains(text(), \"PrimaryBedroom\")]/following-sibling::ul")
-	//for _, primaryBedRoom := range primaryBedRooms {
-	//	// Primary Bedroom Level
-	//	primaryBedRoomLevel := htmlquery.FindOne(primaryBedRoom, ".//span[contains(text(), \"Level\")]")
-	//	if primaryBedRoomLevel != nil {
-	//		zillowData.PrimaryBedroomLevel = strings.TrimSpace(strings.Replace(htmlquery.InnerText(primaryBedRoomLevel), "Level:", "", -1))
-	//	}
-	//
-	//	// Primary Bedroom Dimensions
-	//	primaryBedRoomDimensions := htmlquery.FindOne(primaryBedRoom, ".//span[contains(text(), \"Dimensions\")]")
-	//	if primaryBedRoomDimensions != nil {
-	//		zillowData.PrimaryBedroomDimensions = strings.TrimSpace(strings.Replace(htmlquery.InnerText(primaryBedRoomDimensions), "Dimensions:", "", -1))
-	//	}
-	//}
-	//
-	//// Interior Features
-	//interiorFeatures := htmlquery.FindOne(doc, "//span[contains(text(), \"Interior features\")]")
-	//if interiorFeatures != nil {
-	//	zillowData.InteriorFeatures = strings.TrimSpace(strings.Replace(htmlquery.InnerText(interiorFeatures), "Interior features:", "", -1))
-	//}
-	//
-	//// Basement
-	//basement := htmlquery.FindOne(doc, "//span[contains(text(), \"Basement\")]")
-	//if basement != nil {
-	//	zillowData.Basement = strings.TrimSpace(strings.Replace(htmlquery.InnerText(basement), "Basement:", "", -1))
-	//}
-	//
-	//// Total Interior Livable Area SF
-	//totalInteriorLivableArea := htmlquery.FindOne(doc, "//span[contains(text(), \"Total interior livable area\")]")
-	//if totalInteriorLivableArea != nil {
-	//	zillowData.TotalInteriorLivableAreaSF = strings.TrimSpace(strings.Replace(htmlquery.InnerText(totalInteriorLivableArea), "Total interior livable area:", "", -1))
-	//}
-	//
-	//// # of Fireplaces
-	//offFireplaces := htmlquery.FindOne(doc, "//span[contains(text(), \"Total number of fireplaces\")]")
-	//if offFireplaces != nil {
-	//	zillowData.OfFireplaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(offFireplaces), "Total number of fireplaces:", "", -1))
-	//}
-	//
-	//// Fireplace features
-	//fireplaceFeatures := htmlquery.FindOne(doc, "//span[contains(text(), \"Fireplace features\")]")
-	//if fireplaceFeatures != nil {
-	//	zillowData.FireplaceFeatures = strings.TrimSpace(strings.Replace(htmlquery.InnerText(fireplaceFeatures), "Fireplace features:", "", -1))
-	//}
-	//
-	//// Flooring Type
-	//flooringType := htmlquery.FindOne(doc, "//h6[contains(text(), \"Flooring\")]/following-sibling::ul//span[contains(text(), \"Flooring\")]")
-	//if flooringType != nil {
-	//	zillowData.FlooringType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(flooringType), "Flooring:", "", -1))
-	//}
-	//
-	//// Heating Type
-	//heatingType := htmlquery.FindOne(doc, "//h6[contains(text(), \"Heating\")]/following-sibling::ul//span[contains(text(), \"Heating features\")]")
-	//if heatingType != nil {
-	//	zillowData.HeatingType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(heatingType), "Heating features:", "", -1))
-	//}
-	//
-	//// Parking
-	//parkings := htmlquery.Find(doc, "//h6[contains(text(), \"Parking\")]/following-sibling::ul")
-	//if parkings != nil {
-	//	for _, parking := range parkings {
-	//		// Total Parking Spaces
-	//		totalParkingSpaces := htmlquery.FindOne(parking, ".//span[contains(text(), \"Total spaces\")]")
-	//		if totalParkingSpaces != nil {
-	//			zillowData.TotalParkingSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(totalParkingSpaces), "Total spaces:", "", -1))
-	//		}
-	//
-	//		// Parking Features
-	//		parkingFeatures := htmlquery.FindOne(parking, ".//span[contains(text(), \"Parking features\")]")
-	//		if parkingFeatures != nil {
-	//			zillowData.ParkingFeatures = strings.TrimSpace(strings.Replace(htmlquery.InnerText(parkingFeatures), "Parking features:", "", -1))
-	//		}
-	//
-	//		// Covered Spaces
-	//		coveredSpaces := htmlquery.FindOne(parking, ".//span[contains(text(), \"Covered spaces\")]")
-	//		if coveredSpaces != nil {
-	//			zillowData.CoveredSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(coveredSpaces), "Covered spaces:", "", -1))
-	//		}
-	//
-	//	}
-	//}
-	//
-	//// Lot Features
-	//lotFeatures := htmlquery.FindOne(doc, "//h6[contains(text(), \"Lot\")]/following-sibling::ul//span[contains(text(), \"Lot features\")]")
-	//if lotFeatures != nil {
-	//	zillowData.LotFeatures = strings.TrimSpace(strings.Replace(htmlquery.InnerText(lotFeatures), "Lot features:", "", -1))
-	//}
-	//
-	//// Parcel number
-	//parcelNumber := htmlquery.FindOne(doc, "//h6[contains(text(), \"Other property information\")]/following-sibling::ul//span[contains(text(), \"Parcel number\")]")
-	//if parcelNumber != nil {
-	//	zillowData.ParcelNumber = strings.TrimSpace(strings.Replace(htmlquery.InnerText(parcelNumber), "Parcel number:", "", -1))
-	//}
-	//
-	//// Property details - Property
-	//propertydetails := htmlquery.Find(doc, "//h5[contains(text(), \"Property details\")]/following-sibling::div//h6[contains(text(), \"Property\")]/following-sibling::ul")
-	//if propertydetails != nil {
-	//	for _, property := range propertydetails {
-	//		// # Levels (Stories/Floors)
-	//		levelsStoriesFloors := htmlquery.FindOne(property, ".//span[contains(text(), \"Levels\")]")
-	//		if levelsStoriesFloors != nil {
-	//			zillowData.LevelsStoriesFloors = strings.TrimSpace(strings.Replace(htmlquery.InnerText(levelsStoriesFloors), "Levels:", "", -1))
-	//		}
-	//
-	//		// Patio and Porch Details
-	//		patioAndPorchDetails := htmlquery.FindOne(property, ".//span[contains(text(), \"Patio and porch details\")]")
-	//		if patioAndPorchDetails != nil {
-	//			zillowData.PatioAndPorchDetails = strings.TrimSpace(strings.Replace(htmlquery.InnerText(patioAndPorchDetails), "Patio and porch details:", "", -1))
-	//		}
-	//
-	//	}
-	//}
-	//
-	//// Construction details
-	//constructionDetails := htmlquery.Find(doc, "//h5[contains(text(), \"Construction details\")]/following-sibling::div//h6/following-sibling::ul")
-	//if constructionDetails != nil {
-	//	for _, constructionDetail := range constructionDetails {
-	//		// HomeType
-	//		homeType := htmlquery.FindOne(constructionDetail, ".//span[contains(text(), \"Home type\")]")
-	//		if homeType != nil {
-	//			zillowData.HomeType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(homeType), "Home type:", "", -1))
-	//		}
-	//		// Propery SubType
-	//		propertySubType := htmlquery.FindOne(constructionDetail, ".//span[contains(text(), \"Property subType\")]")
-	//		if propertySubType != nil {
-	//			zillowData.ProperySubType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(propertySubType), "Property subType:", "", -1))
-	//		}
-	//
-	//		// Construction Materials
-	//		constructionMaterials := htmlquery.FindOne(constructionDetail, ".//span[contains(text(), \"Construction materials\")]")
-	//		if constructionMaterials != nil {
-	//			zillowData.ConstructionMaterials = strings.TrimSpace(strings.Replace(htmlquery.InnerText(constructionMaterials), "Construction materials:", "", -1))
-	//		}
-	//
-	//		// Foundation
-	//		foundation := htmlquery.FindOne(constructionDetail, ".//span[contains(text(), \"Foundation\")]")
-	//		if foundation != nil {
-	//			zillowData.Foundation = strings.TrimSpace(strings.Replace(htmlquery.InnerText(foundation), "Foundation:", "", -1))
-	//		}
-	//
-	//		// Roof
-	//		roof := htmlquery.FindOne(constructionDetail, ".//span[contains(text(), \"Roof\")]")
-	//		if roof != nil {
-	//			zillowData.Roof = strings.TrimSpace(strings.Replace(htmlquery.InnerText(roof), "Roof:", "", -1))
-	//		}
-	//
-	//		// New Construction
-	//		newConstruction := htmlquery.FindOne(constructionDetail, ".//span[contains(text(), \"New construction\")]")
-	//		if newConstruction != nil {
-	//			zillowData.NewConstruction = strings.TrimSpace(strings.Replace(htmlquery.InnerText(newConstruction), "New construction:", "", -1))
-	//		}
-	//	}
-	//}
-	//
-	//// Utilities / Green Energy Details
-	//utiGreenEnergyDetails := htmlquery.Find(doc, "//h5[contains(text(), \"Utilities / Green Energy Details\")]/following-sibling::div//h6/following-sibling::ul")
-	//if utiGreenEnergyDetails != nil {
-	//	for _, utiGreenEnergyDetail := range utiGreenEnergyDetails {
-	//		// Sewer Information
-	//		sewerInformation := htmlquery.FindOne(utiGreenEnergyDetail, ".//span[contains(text(), \"Sewer information\")]")
-	//		if sewerInformation != nil {
-	//			zillowData.SewerInformation = strings.TrimSpace(strings.Replace(htmlquery.InnerText(sewerInformation), "Sewer information:", "", -1))
-	//		}
-	//
-	//		// Water Information
-	//		waterInformation := htmlquery.FindOne(utiGreenEnergyDetail, ".//span[contains(text(), \"Water information\")]")
-	//		if waterInformation != nil {
-	//			zillowData.WaterInformation = strings.TrimSpace(strings.Replace(htmlquery.InnerText(waterInformation), "Water information:", "", -1))
-	//		}
-	//	}
-	//}
-	//
-	//// Community and Neighborhood Details
-	//comNeiDetails := htmlquery.Find(doc, "//h5[contains(text(), \"Community and Neighborhood Details\")]/following-sibling::div//h6/following-sibling::ul")
-	//if comNeiDetails != nil {
-	//	for _, comNeiDetail := range comNeiDetails {
-	//		// Region Location
-	//		regionLocation := htmlquery.FindOne(comNeiDetail, ".//span[contains(text(), \"Region\")]")
-	//		if regionLocation != nil {
-	//			zillowData.RegionLocation = strings.TrimSpace(strings.Replace(htmlquery.InnerText(regionLocation), "Region:", "", -1))
-	//		}
-	//
-	//		// Subdivision
-	//		subdivision := htmlquery.FindOne(comNeiDetail, ".//span[contains(text(), \"Subdivision\")]")
-	//		if subdivision != nil {
-	//			zillowData.Subdivision = strings.TrimSpace(strings.Replace(htmlquery.InnerText(subdivision), "Subdivision:", "", -1))
-	//		}
-	//	}
-	//}
-	//
-	//// HOA and financial details
-	//hoaFinancialDetails := htmlquery.Find(doc, "//h5[contains(text(), \"HOA and financial details\")]/following-sibling::div//h6/following-sibling::ul")
-	//if hoaFinancialDetails != nil {
-	//	for _, hoaFinancialDetail := range hoaFinancialDetails {
-	//		// Has HOA
-	//		hasHoa := htmlquery.FindOne(hoaFinancialDetail, ".//span[contains(text(), \"Has HOA\")]")
-	//		if hasHoa != nil {
-	//			zillowData.HasHOA = strings.TrimSpace(strings.Replace(htmlquery.InnerText(hasHoa), "Has HOA:", "", -1))
-	//		}
-	//
-	//		// HOA Fee detail
-	//		hoaFeeDetail := htmlquery.FindOne(hoaFinancialDetail, ".//span[contains(text(), \"HOA fee\")]")
-	//		if hoaFeeDetail != nil {
-	//			zillowData.HOAFeeDetail = strings.TrimSpace(strings.Replace(htmlquery.InnerText(hoaFeeDetail), "HOA fee:", "", -1))
-	//		}
-	//
-	//		// Services included
-	//		servicesIncluded := htmlquery.FindOne(hoaFinancialDetail, ".//span[contains(text(), \"Services included\")]")
-	//		if servicesIncluded != nil {
-	//			zillowData.ServicesIncluded = strings.TrimSpace(strings.Replace(htmlquery.InnerText(servicesIncluded), "Services included:", "", -1))
-	//		}
-	//
-	//		// Association Name
-	//		associationName := htmlquery.FindOne(hoaFinancialDetail, ".//span[contains(text(), \"Association name\")]")
-	//		if associationName != nil {
-	//			zillowData.AssociationName = strings.TrimSpace(strings.Replace(htmlquery.InnerText(associationName), "Association name:", "", -1))
-	//		}
-	//
-	//		// Association phone
-	//		associationPhone := htmlquery.FindOne(hoaFinancialDetail, ".//span[contains(text(), \"Association phone\")]")
-	//		if associationPhone != nil {
-	//			zillowData.AssociationPhone = strings.TrimSpace(strings.Replace(htmlquery.InnerText(associationPhone), "Association phone:", "", -1))
-	//		}
-	//
-	//		//Annual tax amount
-	//		annualTaxAmount := htmlquery.FindOne(hoaFinancialDetail, ".//span[contains(text(), \"Annual tax amount\")]")
-	//		if annualTaxAmount != nil {
-	//			zillowData.AnnualTaxAmount = strings.TrimSpace(strings.Replace(htmlquery.InnerText(annualTaxAmount), "Annual tax amount:", "", -1))
-	//		}
-	//	}
-	//}
-	//
-	//// GreatSchools rating
-	//greatSchoolsRating := htmlquery.Find(doc, "//*[@id=\"ds-nearby-schools-list\"]/li")
-	//if greatSchoolsRating != nil {
-	//	for _, school := range greatSchoolsRating {
-	//		// Elementary School
-	//		elementarySchool := htmlquery.FindOne(school, ".//a[contains(text(), \"Elementary School\")]/following-sibling::span")
-	//		if elementarySchool != nil {
-	//			zillowData.ElementarySchool = strings.Replace(htmlquery.InnerText(elementarySchool), "Distance", ", Distance", -1)
-	//		}
-	//
-	//		// Middle School
-	//		middleSchool := htmlquery.FindOne(school, ".//a[contains(text(), \"Middle School\")]/following-sibling::span")
-	//		if middleSchool != nil {
-	//			zillowData.MiddleSchool = strings.Replace(htmlquery.InnerText(middleSchool), "Distance", ", Distance", -1)
-	//		}
-	//
-	//		// High School
-	//		highSchool := htmlquery.FindOne(school, ".//a[contains(text(), \"High School\")]/following-sibling::span")
-	//		if highSchool != nil {
-	//			zillowData.HighSchool = strings.Replace(htmlquery.InnerText(highSchool), "Distance", ", Distance", -1)
-	//		}
-	//	}
-	//}
-	//
-	//// District
-	//district := htmlquery.FindOne(doc, "//h5[contains(text(), \"Schools provided by the listing agent\")]/following-sibling::div/div[contains(text(), \"District\")]")
-	//if district != nil {
-	//	zillowData.District = strings.TrimSpace(strings.Replace(htmlquery.InnerText(district), "District:", "", -1))
-	//}
-	//
-	//// Data Source
-	//dataSource := htmlquery.FindOne(doc, "//*[contains(text(), \"Find assessor info on the\")]/a/@href")
-	//if dataSource != nil {
-	//	zillowData.DataSource = htmlquery.SelectAttr(dataSource, "href")
-	//}
+	zc.ParseYearBuilt(doc)
+	zc.ParseNaturalGas(doc)
+	zc.ParseCentralAir(doc)
+	zc.ParseGarageSpaces(doc)
+	zc.ParseHoaAmount(doc)
+	zc.ParseLotSizes(doc)
+	zc.ParseBuyerAgentFee(doc)
+	zc.ParseApplicances(doc)
+	zc.ParseLivingRooms(doc)
+	zc.ParsePrimaryBedRooms(doc)
+	zc.ParseInteriorFeatures(doc)
+	zc.ParseBasement(doc)
+	zc.ParseTotalInteriorLivableArea(doc)
+	zc.ParseOffFireplaces(doc)
+	zc.ParseFireplaceFeatures(doc)
+	zc.ParseFlooringType(doc)
+	zc.ParseHeatingType(doc)
+	zc.ParseParking(doc)
+	zc.ParseLotFeatures(doc)
+	zc.ParseParcelNumber(doc)
+	zc.ParsePropertydetails(doc)
+	zc.ParseConstructionDetails(doc)
+	zc.ParseUtiGreenEnergyDetails(doc)
+	zc.ParseComNeiDetails(doc)
+	zc.ParseHoaFinancialDetails(doc)
+	zc.ParseGreatSchools(doc)
+	zc.ParseDistrict(doc)
+	zc.ParseDataSource(doc)
 	zc.CrawlerTables.ZillowData.Maindb3ID = zc.CrawlerTables.Maindb3.ID
-
 	return nil
 }
 
@@ -1009,5 +694,410 @@ func (zc *ZillowCrawler) ParseSourceZillow(doc *html.Node) {
 	sourceZillow := htmlquery.FindOne(doc, "//*[contains(text(), \"Source:\")]/text()")
 	if sourceZillow != nil {
 		zc.CrawlerTables.ZillowData.Source = strings.TrimSpace(strings.Replace(sourceZillow.Data, "Source:", "", -1))
+	}
+}
+
+func (zc *ZillowCrawler) ParseYearBuilt(doc *html.Node) {
+	yearBuilt := htmlquery.FindOne(doc, "//span[contains(text(), \"Year built\")]/text()")
+	if yearBuilt != nil {
+		zc.CrawlerTables.ZillowData.YearBuilt = strings.TrimSpace(strings.Replace(yearBuilt.Data, "Year built:", "", -1))
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseNaturalGas(doc *html.Node) {
+	naturalGas := htmlquery.FindOne(doc, "//*[contains(text(), \"Natural Gas\") or contains(text(), \"natural gas\")]")
+	if naturalGas != nil {
+		zc.CrawlerTables.ZillowData.NaturalGas = true
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseCentralAir(doc *html.Node) {
+	centralAir := htmlquery.FindOne(doc, "//*[contains(text(), \"Central Air\") or contains(text(), \"central air\")]")
+	if centralAir != nil {
+		zc.CrawlerTables.ZillowData.CentralAir = true
+	}
+}
+
+func (zc *ZillowCrawler) ParseGarageSpaces(doc *html.Node) {
+	garageSpaces := htmlquery.FindOne(doc, "//*[contains(text(), \"garage spaces\")]/text()")
+	if garageSpaces != nil {
+		zc.CrawlerTables.ZillowData.OfGarageSpaces = strings.TrimSpace(strings.Replace(garageSpaces.Data, " garage spaces", "", -1))
+	}
+}
+
+func (zc *ZillowCrawler) ParseHoaAmount(doc *html.Node) {
+	hoaAmount := htmlquery.FindOne(doc, "//*[contains(text(), \"annually HOA fee\")]/text()")
+	if hoaAmount != nil {
+		zc.CrawlerTables.ZillowData.HOAAmount = strings.TrimSpace(strings.Replace(hoaAmount.Data, " annually HOA fee", "", -1))
+	}
+}
+
+func (zc *ZillowCrawler) ParseLotSizes(doc *html.Node) {
+	lotSizes := htmlquery.Find(doc, "//*[contains(text(), \"Lot size\")]/text()")
+	if lotSizes != nil {
+		for _, v := range lotSizes {
+			lotSizeData := strings.TrimSpace(strings.Replace(v.Data, "Lot size:", "", -1))
+			if strings.Contains(lotSizeData, "sqft") == true {
+				zc.CrawlerTables.ZillowData.LotSizeSF = lotSizeData
+			}
+			if strings.Contains(lotSizeData, "Acres") == true {
+				zc.CrawlerTables.ZillowData.LotSizeAcres = lotSizeData
+			}
+		}
+
+	}
+}
+
+func (zc *ZillowCrawler) ParseBuyerAgentFee(doc *html.Node) {
+	buyerAgentFee := htmlquery.FindOne(doc, "//*[contains(text(), \"buyer's agent fee\")]/text()")
+	if buyerAgentFee != nil {
+		zc.CrawlerTables.ZillowData.BuyerAgentFee = strings.TrimSpace(strings.Replace(buyerAgentFee.Data, " buyer's agent fee", "", -1))
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseApplicances(doc *html.Node) {
+	applicances := htmlquery.FindOne(doc, "//*[contains(text(), \"Appliances included\")]")
+	if applicances != nil {
+		zc.CrawlerTables.ZillowData.Appliances = strings.TrimSpace(strings.Replace(htmlquery.InnerText(applicances), "Appliances included:", "", -1))
+	}
+}
+
+func (zc *ZillowCrawler) ParseLivingRooms(doc *html.Node) {
+	// Living Room
+	livingRooms := htmlquery.Find(doc, "//h6[contains(text(), \"LivingRoom\")]/following-sibling::ul")
+	for _, livingroom := range livingRooms {
+		// Living Room Level
+		livingRoomLevel := htmlquery.FindOne(livingroom, ".//span[contains(text(), \"Level\")]")
+		if livingRoomLevel != nil {
+			zc.CrawlerTables.ZillowData.LivingRoomLevel = strings.TrimSpace(strings.Replace(htmlquery.InnerText(livingRoomLevel), "Level:", "", -1))
+		}
+
+		// Living Room Dimensions
+		livingRoomDimensions := htmlquery.FindOne(livingroom, ".//span[contains(text(), \"Dimensions\")]")
+		if livingRoomDimensions != nil {
+			zc.CrawlerTables.ZillowData.LivingRoomDimensions = strings.TrimSpace(strings.Replace(htmlquery.InnerText(livingRoomDimensions), "Dimensions:", "", -1))
+		}
+	}
+
+}
+
+func (zc *ZillowCrawler) ParsePrimaryBedRooms(doc *html.Node) {
+	// Primary Bedroom
+	primaryBedRooms := htmlquery.Find(doc, "//h6[contains(text(), \"PrimaryBedroom\")]/following-sibling::ul")
+	for _, primaryBedRoom := range primaryBedRooms {
+		// Primary Bedroom Level
+		primaryBedRoomLevel := htmlquery.FindOne(primaryBedRoom, ".//span[contains(text(), \"Level\")]")
+		if primaryBedRoomLevel != nil {
+			zc.CrawlerTables.ZillowData.PrimaryBedroomLevel = strings.TrimSpace(strings.Replace(htmlquery.InnerText(primaryBedRoomLevel), "Level:", "", -1))
+		}
+
+		// Primary Bedroom Dimensions
+		primaryBedRoomDimensions := htmlquery.FindOne(primaryBedRoom, ".//span[contains(text(), \"Dimensions\")]")
+		if primaryBedRoomDimensions != nil {
+			zc.CrawlerTables.ZillowData.PrimaryBedroomDimensions = strings.TrimSpace(strings.Replace(htmlquery.InnerText(primaryBedRoomDimensions), "Dimensions:", "", -1))
+		}
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseInteriorFeatures(doc *html.Node) {
+	// Interior Features
+	interiorFeatures := htmlquery.FindOne(doc, "//span[contains(text(), \"Interior features\")]")
+	if interiorFeatures != nil {
+		zc.CrawlerTables.ZillowData.InteriorFeatures = strings.TrimSpace(strings.Replace(htmlquery.InnerText(interiorFeatures), "Interior features:", "", -1))
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseBasement(doc *html.Node) {
+	basement := htmlquery.FindOne(doc, "//span[contains(text(), \"Basement\")]")
+	if basement != nil {
+		zc.CrawlerTables.ZillowData.Basement = strings.TrimSpace(strings.Replace(htmlquery.InnerText(basement), "Basement:", "", -1))
+	}
+}
+
+func (zc *ZillowCrawler) ParseTotalInteriorLivableArea(doc *html.Node) {
+	// Total Interior Livable Area SF
+	totalInteriorLivableArea := htmlquery.FindOne(doc, "//span[contains(text(), \"Total interior livable area\")]")
+	if totalInteriorLivableArea != nil {
+		zc.CrawlerTables.ZillowData.TotalInteriorLivableAreaSF = strings.TrimSpace(strings.Replace(htmlquery.InnerText(totalInteriorLivableArea), "Total interior livable area:", "", -1))
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseOffFireplaces(doc *html.Node) {
+	// # of Fireplaces
+	offFireplaces := htmlquery.FindOne(doc, "//span[contains(text(), \"Total number of fireplaces\")]")
+	if offFireplaces != nil {
+		zc.CrawlerTables.ZillowData.OfFireplaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(offFireplaces), "Total number of fireplaces:", "", -1))
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseFireplaceFeatures(doc *html.Node) {
+	// Fireplace features
+	fireplaceFeatures := htmlquery.FindOne(doc, "//span[contains(text(), \"Fireplace features\")]")
+	if fireplaceFeatures != nil {
+		zc.CrawlerTables.ZillowData.FireplaceFeatures = strings.TrimSpace(strings.Replace(htmlquery.InnerText(fireplaceFeatures), "Fireplace features:", "", -1))
+	}
+}
+
+func (zc *ZillowCrawler) ParseFlooringType(doc *html.Node) {
+	// Flooring Type
+	flooringType := htmlquery.FindOne(doc, "//h6[contains(text(), \"Flooring\")]/following-sibling::ul//span[contains(text(), \"Flooring\")]")
+	if flooringType != nil {
+		zc.CrawlerTables.ZillowData.FlooringType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(flooringType), "Flooring:", "", -1))
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseHeatingType(doc *html.Node) {
+	// Heating Type
+	heatingType := htmlquery.FindOne(doc, "//h6[contains(text(), \"Heating\")]/following-sibling::ul//span[contains(text(), \"Heating features\")]")
+	if heatingType != nil {
+		zc.CrawlerTables.ZillowData.HeatingType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(heatingType), "Heating features:", "", -1))
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseParking(doc *html.Node) {
+	// Parking
+	parkings := htmlquery.Find(doc, "//h6[contains(text(), \"Parking\")]/following-sibling::ul")
+	if parkings != nil {
+		for _, parking := range parkings {
+			// Total Parking Spaces
+			totalParkingSpaces := htmlquery.FindOne(parking, ".//span[contains(text(), \"Total spaces\")]")
+			if totalParkingSpaces != nil {
+				zc.CrawlerTables.ZillowData.TotalParkingSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(totalParkingSpaces), "Total spaces:", "", -1))
+			}
+
+			// Parking Features
+			parkingFeatures := htmlquery.FindOne(parking, ".//span[contains(text(), \"Parking features\")]")
+			if parkingFeatures != nil {
+				zc.CrawlerTables.ZillowData.ParkingFeatures = strings.TrimSpace(strings.Replace(htmlquery.InnerText(parkingFeatures), "Parking features:", "", -1))
+			}
+
+			// Covered Spaces
+			coveredSpaces := htmlquery.FindOne(parking, ".//span[contains(text(), \"Covered spaces\")]")
+			if coveredSpaces != nil {
+				zc.CrawlerTables.ZillowData.CoveredSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(coveredSpaces), "Covered spaces:", "", -1))
+			}
+
+		}
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseLotFeatures(doc *html.Node) {
+	// Lot Features
+	lotFeatures := htmlquery.FindOne(doc, "//h6[contains(text(), \"Lot\")]/following-sibling::ul//span[contains(text(), \"Lot features\")]")
+	if lotFeatures != nil {
+		zc.CrawlerTables.ZillowData.LotFeatures = strings.TrimSpace(strings.Replace(htmlquery.InnerText(lotFeatures), "Lot features:", "", -1))
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseParcelNumber(doc *html.Node) {
+	// Parcel number
+	parcelNumber := htmlquery.FindOne(doc, "//h6[contains(text(), \"Other property information\")]/following-sibling::ul//span[contains(text(), \"Parcel number\")]")
+	if parcelNumber != nil {
+		zc.CrawlerTables.ZillowData.ParcelNumber = strings.TrimSpace(strings.Replace(htmlquery.InnerText(parcelNumber), "Parcel number:", "", -1))
+	}
+
+}
+
+func (zc *ZillowCrawler) ParsePropertydetails(doc *html.Node) {
+	// Property details - Property
+	propertydetails := htmlquery.Find(doc, "//h5[contains(text(), \"Property details\")]/following-sibling::div//h6[contains(text(), \"Property\")]/following-sibling::ul")
+	if propertydetails != nil {
+		for _, property := range propertydetails {
+			// # Levels (Stories/Floors)
+			levelsStoriesFloors := htmlquery.FindOne(property, ".//span[contains(text(), \"Levels\")]")
+			if levelsStoriesFloors != nil {
+				zc.CrawlerTables.ZillowData.LevelsStoriesFloors = strings.TrimSpace(strings.Replace(htmlquery.InnerText(levelsStoriesFloors), "Levels:", "", -1))
+			}
+
+			// Patio and Porch Details
+			patioAndPorchDetails := htmlquery.FindOne(property, ".//span[contains(text(), \"Patio and porch details\")]")
+			if patioAndPorchDetails != nil {
+				zc.CrawlerTables.ZillowData.PatioAndPorchDetails = strings.TrimSpace(strings.Replace(htmlquery.InnerText(patioAndPorchDetails), "Patio and porch details:", "", -1))
+			}
+
+		}
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseConstructionDetails(doc *html.Node) {
+	// Construction details
+	constructionDetails := htmlquery.Find(doc, "//h5[contains(text(), \"Construction details\")]/following-sibling::div//h6/following-sibling::ul")
+	if constructionDetails != nil {
+		for _, constructionDetail := range constructionDetails {
+			// HomeType
+			homeType := htmlquery.FindOne(constructionDetail, ".//span[contains(text(), \"Home type\")]")
+			if homeType != nil {
+				zc.CrawlerTables.ZillowData.HomeType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(homeType), "Home type:", "", -1))
+			}
+			// Propery SubType
+			propertySubType := htmlquery.FindOne(constructionDetail, ".//span[contains(text(), \"Property subType\")]")
+			if propertySubType != nil {
+				zc.CrawlerTables.ZillowData.ProperySubType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(propertySubType), "Property subType:", "", -1))
+			}
+
+			// Construction Materials
+			constructionMaterials := htmlquery.FindOne(constructionDetail, ".//span[contains(text(), \"Construction materials\")]")
+			if constructionMaterials != nil {
+				zc.CrawlerTables.ZillowData.ConstructionMaterials = strings.TrimSpace(strings.Replace(htmlquery.InnerText(constructionMaterials), "Construction materials:", "", -1))
+			}
+
+			// Foundation
+			foundation := htmlquery.FindOne(constructionDetail, ".//span[contains(text(), \"Foundation\")]")
+			if foundation != nil {
+				zc.CrawlerTables.ZillowData.Foundation = strings.TrimSpace(strings.Replace(htmlquery.InnerText(foundation), "Foundation:", "", -1))
+			}
+
+			// Roof
+			roof := htmlquery.FindOne(constructionDetail, ".//span[contains(text(), \"Roof\")]")
+			if roof != nil {
+				zc.CrawlerTables.ZillowData.Roof = strings.TrimSpace(strings.Replace(htmlquery.InnerText(roof), "Roof:", "", -1))
+			}
+
+			// New Construction
+			newConstruction := htmlquery.FindOne(constructionDetail, ".//span[contains(text(), \"New construction\")]")
+			if newConstruction != nil {
+				zc.CrawlerTables.ZillowData.NewConstruction = strings.TrimSpace(strings.Replace(htmlquery.InnerText(newConstruction), "New construction:", "", -1))
+			}
+		}
+	}
+}
+
+func (zc *ZillowCrawler) ParseUtiGreenEnergyDetails(doc *html.Node) {
+	// Utilities / Green Energy Details
+	utiGreenEnergyDetails := htmlquery.Find(doc, "//h5[contains(text(), \"Utilities / Green Energy Details\")]/following-sibling::div//h6/following-sibling::ul")
+	if utiGreenEnergyDetails != nil {
+		for _, utiGreenEnergyDetail := range utiGreenEnergyDetails {
+			// Sewer Information
+			sewerInformation := htmlquery.FindOne(utiGreenEnergyDetail, ".//span[contains(text(), \"Sewer information\")]")
+			if sewerInformation != nil {
+				zc.CrawlerTables.ZillowData.SewerInformation = strings.TrimSpace(strings.Replace(htmlquery.InnerText(sewerInformation), "Sewer information:", "", -1))
+			}
+
+			// Water Information
+			waterInformation := htmlquery.FindOne(utiGreenEnergyDetail, ".//span[contains(text(), \"Water information\")]")
+			if waterInformation != nil {
+				zc.CrawlerTables.ZillowData.WaterInformation = strings.TrimSpace(strings.Replace(htmlquery.InnerText(waterInformation), "Water information:", "", -1))
+			}
+		}
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseComNeiDetails(doc *html.Node) {
+	// Community and Neighborhood Details
+	comNeiDetails := htmlquery.Find(doc, "//h5[contains(text(), \"Community and Neighborhood Details\")]/following-sibling::div//h6/following-sibling::ul")
+	if comNeiDetails != nil {
+		for _, comNeiDetail := range comNeiDetails {
+			// Region Location
+			regionLocation := htmlquery.FindOne(comNeiDetail, ".//span[contains(text(), \"Region\")]")
+			if regionLocation != nil {
+				zc.CrawlerTables.ZillowData.RegionLocation = strings.TrimSpace(strings.Replace(htmlquery.InnerText(regionLocation), "Region:", "", -1))
+			}
+
+			// Subdivision
+			subdivision := htmlquery.FindOne(comNeiDetail, ".//span[contains(text(), \"Subdivision\")]")
+			if subdivision != nil {
+				zc.CrawlerTables.ZillowData.Subdivision = strings.TrimSpace(strings.Replace(htmlquery.InnerText(subdivision), "Subdivision:", "", -1))
+			}
+		}
+	}
+}
+
+func (zc *ZillowCrawler) ParseHoaFinancialDetails(doc *html.Node) {
+	// HOA and financial details
+	hoaFinancialDetails := htmlquery.Find(doc, "//h5[contains(text(), \"HOA and financial details\")]/following-sibling::div//h6/following-sibling::ul")
+	if hoaFinancialDetails != nil {
+		for _, hoaFinancialDetail := range hoaFinancialDetails {
+			// Has HOA
+			hasHoa := htmlquery.FindOne(hoaFinancialDetail, ".//span[contains(text(), \"Has HOA\")]")
+			if hasHoa != nil {
+				zc.CrawlerTables.ZillowData.HasHOA = strings.TrimSpace(strings.Replace(htmlquery.InnerText(hasHoa), "Has HOA:", "", -1))
+			}
+
+			// HOA Fee detail
+			hoaFeeDetail := htmlquery.FindOne(hoaFinancialDetail, ".//span[contains(text(), \"HOA fee\")]")
+			if hoaFeeDetail != nil {
+				zc.CrawlerTables.ZillowData.HOAFeeDetail = strings.TrimSpace(strings.Replace(htmlquery.InnerText(hoaFeeDetail), "HOA fee:", "", -1))
+			}
+
+			// Services included
+			servicesIncluded := htmlquery.FindOne(hoaFinancialDetail, ".//span[contains(text(), \"Services included\")]")
+			if servicesIncluded != nil {
+				zc.CrawlerTables.ZillowData.ServicesIncluded = strings.TrimSpace(strings.Replace(htmlquery.InnerText(servicesIncluded), "Services included:", "", -1))
+			}
+
+			// Association Name
+			associationName := htmlquery.FindOne(hoaFinancialDetail, ".//span[contains(text(), \"Association name\")]")
+			if associationName != nil {
+				zc.CrawlerTables.ZillowData.AssociationName = strings.TrimSpace(strings.Replace(htmlquery.InnerText(associationName), "Association name:", "", -1))
+			}
+
+			// Association phone
+			associationPhone := htmlquery.FindOne(hoaFinancialDetail, ".//span[contains(text(), \"Association phone\")]")
+			if associationPhone != nil {
+				zc.CrawlerTables.ZillowData.AssociationPhone = strings.TrimSpace(strings.Replace(htmlquery.InnerText(associationPhone), "Association phone:", "", -1))
+			}
+
+			//Annual tax amount
+			annualTaxAmount := htmlquery.FindOne(hoaFinancialDetail, ".//span[contains(text(), \"Annual tax amount\")]")
+			if annualTaxAmount != nil {
+				zc.CrawlerTables.ZillowData.AnnualTaxAmount = strings.TrimSpace(strings.Replace(htmlquery.InnerText(annualTaxAmount), "Annual tax amount:", "", -1))
+			}
+		}
+	}
+}
+
+func (zc *ZillowCrawler) ParseGreatSchools(doc *html.Node) {
+	// GreatSchools rating
+	greatSchoolsRating := htmlquery.Find(doc, "//*[@id=\"ds-nearby-schools-list\"]/li")
+	if greatSchoolsRating != nil {
+		for _, school := range greatSchoolsRating {
+			// Elementary School
+			elementarySchool := htmlquery.FindOne(school, ".//a[contains(text(), \"Elementary School\")]/following-sibling::span")
+			if elementarySchool != nil {
+				zc.CrawlerTables.ZillowData.ElementarySchool = strings.Replace(htmlquery.InnerText(elementarySchool), "Distance", ", Distance", -1)
+			}
+
+			// Middle School
+			middleSchool := htmlquery.FindOne(school, ".//a[contains(text(), \"Middle School\")]/following-sibling::span")
+			if middleSchool != nil {
+				zc.CrawlerTables.ZillowData.MiddleSchool = strings.Replace(htmlquery.InnerText(middleSchool), "Distance", ", Distance", -1)
+			}
+
+			// High School
+			highSchool := htmlquery.FindOne(school, ".//a[contains(text(), \"High School\")]/following-sibling::span")
+			if highSchool != nil {
+				zc.CrawlerTables.ZillowData.HighSchool = strings.Replace(htmlquery.InnerText(highSchool), "Distance", ", Distance", -1)
+			}
+		}
+	}
+
+}
+
+func (zc *ZillowCrawler) ParseDistrict(doc *html.Node) {
+	// District
+	district := htmlquery.FindOne(doc, "//h5[contains(text(), \"Schools provided by the listing agent\")]/following-sibling::div/div[contains(text(), \"District\")]")
+	if district != nil {
+		zc.CrawlerTables.ZillowData.District = strings.TrimSpace(strings.Replace(htmlquery.InnerText(district), "District:", "", -1))
+	}
+}
+
+func (zc *ZillowCrawler) ParseDataSource(doc *html.Node) {
+	// Data Source
+	dataSource := htmlquery.FindOne(doc, "//*[contains(text(), \"Find assessor info on the\")]/a/@href")
+	if dataSource != nil {
+		zc.CrawlerTables.ZillowData.DataSource = htmlquery.SelectAttr(dataSource, "href")
 	}
 }
