@@ -3,32 +3,45 @@ package main
 import (
 	"fmt"
 	"github.com/hibiken/asynq"
+	"github.com/spf13/viper"
 	"log"
 	"multilogin_scraping/initialization"
 	"multilogin_scraping/tasks"
 )
 
-const redisAddr = "127.0.0.1:6379"
+func init() {
+	viper.SetConfigFile("config.json")
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(err)
+	}
 
-func main2() {
+	if viper.GetBool("debug") {
+		fmt.Println("Service RUN on DEBUG mode")
+	}
+}
+
+func main() {
 	logger := initialization.InitLogger(
 		map[string]interface{}{"Logger": "Worker"},
-		"./logs/workers.log",
+		viper.GetString("crawler.workers.log_file"),
 	)
 
 	// Init Db connection
 	db, err := initialization.InitDb()
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("error Db connection: %v", err.Error()))
-		panic(err.Error())
 	}
 	logger.Info("database connected")
 
 	srv := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: redisAddr},
+		asynq.RedisClientOpt{
+			Addr: viper.GetString("crawler.redis.address"),
+			DB:   viper.GetInt("crawler.redis.db"),
+		},
 		asynq.Config{
 			// Specify how many concurrent workers to use
-			Concurrency: 10,
+			Concurrency: viper.GetInt("crawler.workers.concurrent"),
 			// Optionally specify multiple queues with different priority.
 			Queues: map[string]int{
 				"critical": 6,

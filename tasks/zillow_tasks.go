@@ -52,8 +52,6 @@ func (processor *ZillowProcessor) ZillowCrawlerProcessTask(ctx context.Context, 
 func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger) {
 	c := colly.NewCollector()
 
-	zillowLogger.Info("test data")
-
 	maindb3Service := registry.RegisterMaindb3Service(db)
 	zillowService := registry.RegisterZillowService(db)
 	maindb3List, err := maindb3Service.ListMaindb3Data(

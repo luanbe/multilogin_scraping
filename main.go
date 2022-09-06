@@ -9,6 +9,7 @@ import (
 	"multilogin_scraping/initialization"
 	"multilogin_scraping/tasks"
 	"net/http"
+	"time"
 )
 
 func init() {
@@ -34,7 +35,6 @@ func main() {
 	db, err := initialization.InitDb()
 	if err != nil {
 		logger.Fatal(fmt.Sprint("error Db connection: %v", err.Error()))
-		panic(err.Error())
 	}
 	logger.Info("database connected")
 
@@ -44,8 +44,8 @@ func main() {
 	// Int Router
 	router := initialization.InitRouting(db, sessionManager)
 
-	if err := ClientHandle(logger); err != nil {
-		logger.Fatal(fmt.Sprintf("could not create task: %v", err))
+	if err := PeriodicTasks(logger); err != nil {
+		logger.Fatal(fmt.Sprintf("could not create periodic task: %v", err))
 	}
 
 	logger.Info(fmt.Sprintf("Server START on port%v", viper.GetString("server.address")))
@@ -56,16 +56,51 @@ func main() {
 }
 
 func ClientHandle(logger *zap.Logger) error {
-	client := asynq.NewClient(asynq.RedisClientOpt{Addr: "127.0.0.1:6379"})
+	client := asynq.NewClient(asynq.RedisClientOpt{
+		Addr: viper.GetString("crawler.redis.address"),
+		DB:   viper.GetInt("crawler.redis.db"),
+	})
 	defer client.Close()
 	task, err := tasks.NewZillowCrawlerTask()
 	if err != nil {
 		return err
 	}
-	info, err := client.Enqueue(task)
+	info, err := client.Enqueue(task, asynq.ProcessIn(viper.GetDuration("crawler.zillow_crawler.periodic_run")*time.Minute))
 	if err != nil {
 		return err
 	}
 	logger.Info(fmt.Sprintf("enqueued task: id=%s queue=%s", info.ID, info.Queue))
+	return nil
+}
+
+func PeriodicTasks(logger *zap.Logger) error {
+	// Example of using America/Los_Angeles timezone instead of the default UTC timezone.
+	loc, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		panic(err)
+	}
+	scheduler := asynq.NewScheduler(
+		asynq.RedisClientOpt{
+			Addr: viper.GetString("crawler.redis.address"),
+			DB:   viper.GetInt("crawler.redis.db"),
+		},
+		&asynq.SchedulerOpts{
+			Location: loc,
+		},
+	)
+	zillowCrawlerTask, err := tasks.NewZillowCrawlerTask()
+	if err != nil {
+		return err
+	}
+	entryID, err := scheduler.Register(viper.GetString("crawler.zillow_crawler.periodic_run"), zillowCrawlerTask)
+	if err != nil {
+		return err
+	}
+	logger.Info(fmt.Sprintf("registered an entry: %q\n", entryID))
+
+	if err := scheduler.Run(); err != nil {
+		return err
+	}
+
 	return nil
 }
