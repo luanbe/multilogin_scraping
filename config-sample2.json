@@ -24,7 +24,7 @@
     "debug": false,
     "zillow_crawler": {
       "concurrent": 1,
-      "log_file": "./zillow_crawler.log"
+      "log_file": "./logs/zillow_crawler.log"
     },
     "multilogin_url": "http://localhost:35000",
     "crawler_status": {

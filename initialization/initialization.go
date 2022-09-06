@@ -65,6 +65,7 @@ func InitLogger(InitFields map[string]interface{}, LogFilePath string) *zap.Logg
 	}
 
 	logger, _ := cfg.Build()
+	defer logger.Sync()
 	return logger
 
 }

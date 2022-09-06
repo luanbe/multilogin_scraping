@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"go.uber.org/zap"
 	util "multilogin_scraping/pkg/utils"
 	"net/http"
 	"time"
@@ -23,10 +24,11 @@ type Profile struct {
 type BaseSelenium struct {
 	WebDriver selenium.WebDriver
 	Profile   *Profile
+	logger    *zap.Logger
 }
 
-func NewBaseSelenium() *BaseSelenium {
-	return &BaseSelenium{}
+func NewBaseSelenium(logger *zap.Logger) *BaseSelenium {
+	return &BaseSelenium{logger: logger}
 }
 
 var mla_url string = "/api/v1/profile/start?automation=true&profileId="
@@ -36,7 +38,7 @@ func (ps *Profile) CreateProfile() error {
 	oses := []string{"win", "mac", "android", "lin"}
 	//browsers := []string{"stealthfox", "mimic"}
 	browsers := []string{"stealthfox"}
-	values := map[string]string{
+	values := &map[string]string{
 		"name":    fmt.Sprint(ps.Name, "-Crawler-", util.RandInt()),
 		"os":      util.RandSliceStr(oses),
 		"browser": util.RandSliceStr(browsers),

@@ -39,3 +39,23 @@ services:
       - mariadb
     networks:
       db:
+
+  redis:
+    image: redis:alpine
+    expose:
+      - "6379"
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      db:
+
+  redis-cli:
+    image: hibiken/asynqmon
+    expose:
+      - "3001"
+    ports:
+      - "3001:8080"
+    environment:
+      - PORT=8080
+      - REDIS_ADDR=redis:6379

@@ -54,7 +54,7 @@ func NewZillowCrawler(
 	maindb3Service service.Maindb3Service,
 	logger *zap.Logger,
 ) (*ZillowCrawler, error) {
-	BaseSel := crawlers.NewBaseSelenium()
+	BaseSel := crawlers.NewBaseSelenium(logger)
 	if err := BaseSel.StartSelenium("zillow"); err != nil {
 		return nil, err
 	}
