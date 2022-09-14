@@ -1,10 +1,11 @@
 package entity
 
 import (
-	"gorm.io/gorm"
 	"multilogin_scraping/app/models/base"
 	util "multilogin_scraping/pkg/utils"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // TODO: Use swagger later

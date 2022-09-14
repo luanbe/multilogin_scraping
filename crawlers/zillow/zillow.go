@@ -3,8 +3,6 @@ package zillow
 import (
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
-	"golang.org/x/net/html"
 	"log"
 	"multilogin_scraping/app/service"
 	"multilogin_scraping/crawlers"
@@ -12,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
+	"golang.org/x/net/html"
 
 	"github.com/icrowley/fake"
 	"github.com/spf13/viper"

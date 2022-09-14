@@ -2,16 +2,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/go-co-op/gocron"
-	"github.com/hibiken/asynq"
-	"github.com/spf13/viper"
-	"go.uber.org/zap"
-	"gorm.io/gorm"
 	"log"
 	"multilogin_scraping/initialization"
 	"multilogin_scraping/tasks"
 	"net/http"
 	"time"
+
+	"github.com/go-co-op/gocron"
+	"github.com/hibiken/asynq"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 func init() {
