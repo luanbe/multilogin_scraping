@@ -1,0 +1,63 @@
+version: '3'
+
+volumes:
+  mariadb:
+    driver: local
+
+networks:
+  db:
+    driver: bridge
+
+services:
+  mariadb:
+    image: mariadb:10.6
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: crawler
+      MYSQL_USER:  crawler
+      MYSQL_PASSWORD: crawler
+    expose:
+      - "40000"
+    ports:
+      - "40000:3306"
+    volumes:
+      - mariadb:/var/lib/mysql
+    networks:
+      db:
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    restart: always
+    expose:
+      - "40001"
+    ports:
+      - "40001:80"
+    environment:
+      - PMA_HOST=mariadb
+      - PMA_PORT=3306
+    depends_on:
+      - mariadb
+    networks:
+      db:
+
+  redis:
+    image: redis:alpine
+    expose:
+      - "6379"
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      db:
+
+  redis-cli:
+    image: hibiken/asynqmon
+    expose:
+      - "3001"
+    ports:
+      - "3001:8080"
+    environment:
+      - PORT=8080
+      - REDIS_ADDR=redis:6379
+      - REDIS_DB=0
+      - ENABLE_METRICS_EXPORTER=true
