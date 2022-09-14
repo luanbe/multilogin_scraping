@@ -55,7 +55,7 @@ func main() {
 	// mux maps a type to a handler
 	mux := asynq.NewServeMux()
 	zillowProcessor := tasks.NewZillowProcessor(db, logger)
-	mux.HandleFunc(tasks.TypeZillowCrawler, zillowProcessor.ZillowCrawlerProcessTask)
+	mux.HandleFunc(tasks.TypeZillowCrawler, zillowProcessor.ZillowRedisProcessTask)
 
 	if err := srv.Run(mux); err != nil {
 		log.Fatalf("could not run server: %v", err)

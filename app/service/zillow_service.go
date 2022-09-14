@@ -7,6 +7,10 @@ import (
 
 type ZillowService interface {
 	AddZillow(zillowData *entity.ZillowData) error
+	UpdateZillow(zillowData *entity.ZillowData, id uint64) error
+	GetZillow(id uint64) (*entity.ZillowData, error)
+	UpdateZillowPriceHistory(zillowPriceHistories []*entity.ZillowPriceHistory) error
+	UpdateZillowPublicTaxHistory(zillowPublicTaxHistories []*entity.ZillowPublicTaxHistory) error
 }
 
 type ZillowServiceImpl struct {
@@ -26,6 +30,51 @@ func NewZillowService(
 func (s *ZillowServiceImpl) AddZillow(zillowData *entity.ZillowData) error {
 	if err := s.zillowRepo.AddZillow(zillowData); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (s *ZillowServiceImpl) UpdateZillow(zillowData *entity.ZillowData, id uint64) error {
+	if err := s.zillowRepo.UpdateZillow(zillowData, map[string]interface{}{"id": id}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ZillowServiceImpl) GetZillow(id uint64) (*entity.ZillowData, error) {
+	zillowData, err := s.zillowRepo.GetZillowFirst(map[string]interface{}{"id": id})
+	if err != nil && err.Error() != "record not found" {
+		return nil, err
+	}
+
+	return zillowData, nil
+}
+
+func (s *ZillowServiceImpl) UpdateZillowPriceHistory(zillowPriceHistories []*entity.ZillowPriceHistory) error {
+	for _, history := range zillowPriceHistories {
+		historyData, err := s.zillowRepo.GetZillowPriceHistoryFirst(map[string]interface{}{"maindb3_id": history.Maindb3ID, "date": history.Date})
+		if err != nil && err.Error() != "record not found" {
+			return err
+		}
+		if historyData == nil {
+			if err := s.zillowRepo.AddZillowPriceHistory(history); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+func (s *ZillowServiceImpl) UpdateZillowPublicTaxHistory(zillowPublicTaxHistories []*entity.ZillowPublicTaxHistory) error {
+	for _, history := range zillowPublicTaxHistories {
+		historyData, err := s.zillowRepo.GetZillowPublicTaxHistoryFirst(map[string]interface{}{"maindb3_id": history.Maindb3ID, "year": history.Year})
+		if err != nil && err.Error() != "record not found" {
+			return err
+		}
+		if historyData == nil {
+			if err := s.zillowRepo.AddZillowPublicTaxHistory(history); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

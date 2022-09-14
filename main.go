@@ -2,14 +2,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/hibiken/asynq"
-	"github.com/spf13/viper"
-	"go.uber.org/zap"
 	"log"
 	"multilogin_scraping/initialization"
 	"multilogin_scraping/tasks"
 	"net/http"
 	"time"
+
+	"github.com/go-co-op/gocron"
+	"github.com/hibiken/asynq"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 func init() {
@@ -44,8 +47,14 @@ func main() {
 	// Int Router
 	router := initialization.InitRouting(db, sessionManager)
 
-	if err := PeriodicTasks(logger); err != nil {
-		logger.Fatal(fmt.Sprintf("could not create periodic task: %v", err))
+	if viper.GetBool("crawler.workers.redis_task") == true {
+		if err := RedisPeriodicTasks(logger); err != nil {
+			logger.Fatal(fmt.Sprintf("could not create periodic task: %v", err))
+		}
+	} else {
+		if err := PeriodicTasks(db, logger); err != nil {
+			logger.Fatal(fmt.Sprintf("could not create periodic task: %v", err))
+		}
 	}
 
 	logger.Info(fmt.Sprintf("Server START on port%v", viper.GetString("server.address")))
@@ -55,25 +64,7 @@ func main() {
 	))
 }
 
-func ClientHandle(logger *zap.Logger) error {
-	client := asynq.NewClient(asynq.RedisClientOpt{
-		Addr: viper.GetString("crawler.redis.address"),
-		DB:   viper.GetInt("crawler.redis.db"),
-	})
-	defer client.Close()
-	task, err := tasks.NewZillowCrawlerTask()
-	if err != nil {
-		return err
-	}
-	info, err := client.Enqueue(task, asynq.ProcessIn(viper.GetDuration("crawler.zillow_crawler.periodic_run")*time.Minute))
-	if err != nil {
-		return err
-	}
-	logger.Info(fmt.Sprintf("enqueued task: id=%s queue=%s", info.ID, info.Queue))
-	return nil
-}
-
-func PeriodicTasks(logger *zap.Logger) error {
+func RedisPeriodicTasks(logger *zap.Logger) error {
 	// Example of using America/Los_Angeles timezone instead of the default UTC timezone.
 	loc, err := time.LoadLocation("America/Los_Angeles")
 	if err != nil {
@@ -88,11 +79,11 @@ func PeriodicTasks(logger *zap.Logger) error {
 			Location: loc,
 		},
 	)
-	zillowCrawlerTask, err := tasks.NewZillowCrawlerTask()
+	zillowCrawlerTask, err := tasks.NewZillowRedisTask()
 	if err != nil {
 		return err
 	}
-	entryID, err := scheduler.Register(viper.GetString("crawler.zillow_crawler.periodic_run"), zillowCrawlerTask)
+	entryID, err := scheduler.Register(fmt.Sprint("@every ", viper.GetString("crawler.zillow_crawler.periodic_run")), zillowCrawlerTask)
 	if err != nil {
 		return err
 	}
@@ -102,5 +93,20 @@ func PeriodicTasks(logger *zap.Logger) error {
 		return err
 	}
 
+	return nil
+}
+
+func PeriodicTasks(db *gorm.DB, logger *zap.Logger) error {
+	s := gocron.NewScheduler(time.UTC)
+	s.SetMaxConcurrentJobs(viper.GetInt("crawler.workers.concurrent"), gocron.RescheduleMode)
+	_, err := s.Every(viper.GetString("crawler.zillow_crawler.periodic_run")).Do(tasks.RunCrawler, db, logger)
+	if err != nil {
+		return err
+	}
+	_, err = s.Every(viper.GetString("crawler.zillow_crawler.periodic_interval")).Do(tasks.RunCrawlerInterval, db, logger)
+	if err != nil {
+		return err
+	}
+	s.StartAsync()
 	return nil
 }

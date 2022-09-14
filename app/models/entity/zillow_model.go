@@ -1,10 +1,11 @@
 package entity
 
 import (
-	"gorm.io/gorm"
 	"multilogin_scraping/app/models/base"
 	util "multilogin_scraping/pkg/utils"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // TODO: Use swagger later
@@ -92,6 +93,25 @@ type ZillowData struct {
 	DataSource                 string    `gorm:"type:varchar(250)" json:"data_source"`
 	CountyTaxAssessorURL       string    `gorm:"type:text" json:"county_tax_assessor_url"`
 	TimestampForDataExtraction time.Time `gorm:"type:timestamp" json:"timestamp_for_data_extraction"`
+}
+
+type ZillowPriceHistory struct {
+	base.BaseIDModel
+	Maindb3ID uint64 `gorm:"column:maindb3_id" json:"maindb3_id"`
+	Address   string `gorm:"type:text" json:"address"`
+	Date      string `gorm:"type:varchar(100)" json:"date"`
+	Event     string `gorm:"type:varchar(100)" json:"event"`
+	Price     string `gorm:"type:varchar(100)" json:"price"`
+	Source    string `gorm:"type:varchar(100)" json:"source"`
+}
+
+type ZillowPublicTaxHistory struct {
+	base.BaseIDModel
+	Maindb3ID     uint64 `gorm:"column:maindb3_id" json:"maindb3_id"`
+	Address       string `gorm:"type:text" json:"address"`
+	Year          string `gorm:"type:varchar(50)" json:"date"`
+	PropertyTaxes string `gorm:"type:varchar(100)" json:"property_taxes"`
+	TaxAssessment string `gorm:"type:varchar(100)" json:"tax_assessment"`
 }
 
 func (ZillowData) TableName() string {

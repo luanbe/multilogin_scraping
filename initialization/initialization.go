@@ -2,21 +2,23 @@ package initialization
 
 import (
 	"encoding/gob"
+	"net/http"
+	"time"
+
 	"github.com/alexedwards/scs/v2"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/spf13/viper"
-	"gorm.io/gorm"
 	"multilogin_scraping/app/delivery"
 	"multilogin_scraping/app/models/entity"
 	"multilogin_scraping/app/registry"
 	"multilogin_scraping/helper/database"
+
+	"github.com/spf13/viper"
+	"gorm.io/gorm"
 )
 
 type LoggerImpl struct {
@@ -41,7 +43,13 @@ func InitDb() (*gorm.DB, error) {
 	// db.Migrator().DropTable(&entity.User{})
 
 	// Define auto migration here
-	_ = db.AutoMigrate(&entity.User{}, &entity.Maindb3{}, &entity.ZillowData{})
+	_ = db.AutoMigrate(
+		&entity.User{},
+		&entity.Maindb3{},
+		&entity.ZillowData{},
+		&entity.ZillowPublicTaxHistory{},
+		&entity.ZillowPriceHistory{},
+	)
 
 	//seedingPredefined(db, logger)
 

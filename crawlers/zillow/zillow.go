@@ -3,8 +3,6 @@ package zillow
 import (
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
-	"golang.org/x/net/html"
 	"log"
 	"multilogin_scraping/app/service"
 	"multilogin_scraping/crawlers"
@@ -12,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
+	"golang.org/x/net/html"
 
 	"github.com/icrowley/fake"
 	"github.com/spf13/viper"
@@ -24,19 +25,22 @@ import (
 )
 
 type ZillowCrawler struct {
-	WebDriver       selenium.WebDriver
-	BaseSel         *crawlers.BaseSelenium
-	Profile         *crawlers.Profile
-	CZillow         *colly.Collector
-	SearchPageReq   *SearchPageReq
-	CrawlerTables   *CrawlerTables
-	CrawlerServices CrawlerServices
-	Logger          *zap.Logger
+	WebDriver        selenium.WebDriver
+	BaseSel          *crawlers.BaseSelenium
+	Profile          *crawlers.Profile
+	CZillow          *colly.Collector
+	SearchPageReq    *SearchPageReq
+	CrawlerTables    *CrawlerTables
+	CrawlerServices  CrawlerServices
+	Logger           *zap.Logger
+	OnlyHistoryTable bool
 }
 
 type CrawlerTables struct {
-	Maindb3    *entity.Maindb3
-	ZillowData *entity.ZillowData
+	Maindb3                *entity.Maindb3
+	ZillowData             *entity.ZillowData
+	ZillowPriceHistory     []*entity.ZillowPriceHistory
+	ZillowPublicTaxHistory []*entity.ZillowPublicTaxHistory
 	//ZillowData *entry.ZillowData
 }
 
@@ -53,6 +57,7 @@ func NewZillowCrawler(
 	zillowService service.ZillowService,
 	maindb3Service service.Maindb3Service,
 	logger *zap.Logger,
+	onlyHistoryTable bool,
 ) (*ZillowCrawler, error) {
 	BaseSel := crawlers.NewBaseSelenium(logger)
 	if err := BaseSel.StartSelenium("zillow"); err != nil {
@@ -68,13 +73,19 @@ func NewZillowCrawler(
 	c.UserAgent = userAgent.(string)
 
 	return &ZillowCrawler{
-		WebDriver:       BaseSel.WebDriver,
-		BaseSel:         BaseSel,
-		Profile:         BaseSel.Profile,
-		CZillow:         c,
-		CrawlerTables:   &CrawlerTables{maindb3, &entity.ZillowData{}},
-		CrawlerServices: CrawlerServices{zillowService, maindb3Service},
-		Logger:          logger,
+		WebDriver: BaseSel.WebDriver,
+		BaseSel:   BaseSel,
+		Profile:   BaseSel.Profile,
+		CZillow:   c,
+		CrawlerTables: &CrawlerTables{
+			maindb3,
+			&entity.ZillowData{},
+			[]*entity.ZillowPriceHistory{},
+			[]*entity.ZillowPublicTaxHistory{},
+		},
+		CrawlerServices:  CrawlerServices{zillowService, maindb3Service},
+		Logger:           logger,
+		OnlyHistoryTable: onlyHistoryTable,
 	}, nil
 }
 
@@ -263,19 +274,57 @@ func (zc *ZillowCrawler) CrawlAddress(address string) error {
 	if err := zc.ParseData(pageSource); err != nil {
 		return err
 	}
-	if err := zc.UpdateDB(); err != nil {
+	if zc.OnlyHistoryTable == false {
+		if err := zc.UpdateZillowDB(); err != nil {
+			return err
+		}
+	}
+
+	if err := zc.UpdateZillowPriceHistoryDB(); err != nil {
+		return err
+	}
+	if err := zc.UpdateZillowPublicTaxHistoryDB(); err != nil {
+		return err
+	}
+	if err := zc.UpdateMaindb3DB(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (zc *ZillowCrawler) UpdateZillowDB() error {
+	zillowData, err := zc.CrawlerServices.ZillowService.GetZillow(zc.CrawlerTables.Maindb3.ID)
+	if err != nil {
+		return err
+	}
+	if zillowData == nil {
+		if err := zc.CrawlerServices.ZillowService.AddZillow(zc.CrawlerTables.ZillowData); err != nil {
+			return err
+		}
+	} else {
+		if err := zc.CrawlerServices.ZillowService.UpdateZillow(zc.CrawlerTables.ZillowData, zillowData.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (zc *ZillowCrawler) UpdateMaindb3DB() error {
+	if err := zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerTables.Maindb3, viper.GetString("crawler.crawler_status.succeeded")); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (zc *ZillowCrawler) UpdateDB() error {
-
-	if err := zc.CrawlerServices.ZillowService.AddZillow(zc.CrawlerTables.ZillowData); err != nil {
+func (zc *ZillowCrawler) UpdateZillowPriceHistoryDB() error {
+	if err := zc.CrawlerServices.ZillowService.UpdateZillowPriceHistory(zc.CrawlerTables.ZillowPriceHistory); err != nil {
 		return err
 	}
+	return nil
+}
 
-	if err := zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerTables.Maindb3, viper.GetString("crawler.crawler_status.succeeded")); err != nil {
+func (zc *ZillowCrawler) UpdateZillowPublicTaxHistoryDB() error {
+	if err := zc.CrawlerServices.ZillowService.UpdateZillowPublicTaxHistory(zc.CrawlerTables.ZillowPublicTaxHistory); err != nil {
 		return err
 	}
 	return nil
@@ -288,61 +337,65 @@ func (zc *ZillowCrawler) ParseData(source string) error {
 	if err != nil {
 		return err
 	}
-
 	zc.ParseURL()
 	zc.ParseBedBathSF(doc)
 	zc.ParseAddress(doc)
-	zc.ParseFullBathroom(doc)
-	zc.ParseHalfBathroom(doc)
-	zc.ParseSalePrice(doc)
-	zc.ParseZestimate(doc)
-	zc.ParseEstPayment(doc)
-	zc.ParsePrincipalInterest(doc)
-	zc.ParseMortgageInsurance(doc)
-	zc.ParsePropertyTaxes(doc)
-	zc.ParseHomeInsurance(doc)
-	zc.ParseHoaFee(doc)
-	zc.ParseUtilities(doc)
-	zc.ParseEstimatedSalesRange(doc)
-	zc.ParsePictures(doc)
-	zc.ParseTimeOnZillow(doc)
-	zc.ParseViews(doc)
-	zc.ParseSaves(doc)
-	zc.ParseOverview(doc)
-	zc.ParseMSL(doc)
-	zc.ParseZillowCheckedDate(doc)
-	zc.ParseDataUploadedDate(doc)
-	zc.ParseListBy(doc)
-	zc.ParseSourceZillow(doc)
-	zc.ParseYearBuilt(doc)
-	zc.ParseNaturalGas(doc)
-	zc.ParseCentralAir(doc)
-	zc.ParseGarageSpaces(doc)
-	zc.ParseHoaAmount(doc)
-	zc.ParseLotSizes(doc)
-	zc.ParseBuyerAgentFee(doc)
-	zc.ParseApplicances(doc)
-	zc.ParseLivingRooms(doc)
-	zc.ParsePrimaryBedRooms(doc)
-	zc.ParseInteriorFeatures(doc)
-	zc.ParseBasement(doc)
-	zc.ParseTotalInteriorLivableArea(doc)
-	zc.ParseOffFireplaces(doc)
-	zc.ParseFireplaceFeatures(doc)
-	zc.ParseFlooringType(doc)
-	zc.ParseHeatingType(doc)
-	zc.ParseParking(doc)
-	zc.ParseLotFeatures(doc)
-	zc.ParseParcelNumber(doc)
-	zc.ParsePropertydetails(doc)
-	zc.ParseConstructionDetails(doc)
-	zc.ParseUtiGreenEnergyDetails(doc)
-	zc.ParseComNeiDetails(doc)
-	zc.ParseHoaFinancialDetails(doc)
-	zc.ParseGreatSchools(doc)
-	zc.ParseDistrict(doc)
-	zc.ParseDataSource(doc)
-	zc.CrawlerTables.ZillowData.Maindb3ID = zc.CrawlerTables.Maindb3.ID
+	if zc.OnlyHistoryTable == false {
+		zc.ParseFullBathroom(doc)
+		zc.ParseHalfBathroom(doc)
+		zc.ParseSalePrice(doc)
+		zc.ParseZestimate(doc)
+		zc.ParseEstPayment(doc)
+		zc.ParsePrincipalInterest(doc)
+		zc.ParseMortgageInsurance(doc)
+		zc.ParsePropertyTaxes(doc)
+		zc.ParseHomeInsurance(doc)
+		zc.ParseHoaFee(doc)
+		zc.ParseUtilities(doc)
+		zc.ParseEstimatedSalesRange(doc)
+		zc.ParsePictures(doc)
+		zc.ParseTimeOnZillow(doc)
+		zc.ParseViews(doc)
+		zc.ParseSaves(doc)
+		zc.ParseOverview(doc)
+		zc.ParseMSL(doc)
+		zc.ParseZillowCheckedDate(doc)
+		zc.ParseDataUploadedDate(doc)
+		zc.ParseListBy(doc)
+		zc.ParseSourceZillow(doc)
+		zc.ParseYearBuilt(doc)
+		zc.ParseNaturalGas(doc)
+		zc.ParseCentralAir(doc)
+		zc.ParseGarageSpaces(doc)
+		zc.ParseHoaAmount(doc)
+		zc.ParseLotSizes(doc)
+		zc.ParseBuyerAgentFee(doc)
+		zc.ParseApplicances(doc)
+		zc.ParseLivingRooms(doc)
+		zc.ParsePrimaryBedRooms(doc)
+		zc.ParseInteriorFeatures(doc)
+		zc.ParseBasement(doc)
+		zc.ParseTotalInteriorLivableArea(doc)
+		zc.ParseOffFireplaces(doc)
+		zc.ParseFireplaceFeatures(doc)
+		zc.ParseFlooringType(doc)
+		zc.ParseHeatingType(doc)
+		zc.ParseParking(doc)
+		zc.ParseLotFeatures(doc)
+		zc.ParseParcelNumber(doc)
+		zc.ParsePropertydetails(doc)
+		zc.ParseConstructionDetails(doc)
+		zc.ParseUtiGreenEnergyDetails(doc)
+		zc.ParseComNeiDetails(doc)
+		zc.ParseHoaFinancialDetails(doc)
+		zc.ParseGreatSchools(doc)
+		zc.ParseDistrict(doc)
+		zc.ParseDataSource(doc)
+		zc.CrawlerTables.ZillowData.Maindb3ID = zc.CrawlerTables.Maindb3.ID
+	}
+	zc.ParseZillowPriceHistory(doc)
+	zc.ParseZillowPublicTaxHistory(doc)
+
 	return nil
 }
 
@@ -1099,5 +1152,56 @@ func (zc *ZillowCrawler) ParseDataSource(doc *html.Node) {
 	dataSource := htmlquery.FindOne(doc, "//*[contains(text(), \"Find assessor info on the\")]/a/@href")
 	if dataSource != nil {
 		zc.CrawlerTables.ZillowData.DataSource = htmlquery.SelectAttr(dataSource, "href")
+	}
+}
+
+func (zc *ZillowCrawler) ParseZillowPriceHistory(doc *html.Node) {
+	priceHistories := htmlquery.Find(doc, "//h5[contains(text(), \"Price history\")]/following-sibling::table/tbody/tr[@label]")
+	if priceHistories != nil {
+		for _, history := range priceHistories {
+			priceHistory := &entity.ZillowPriceHistory{}
+			date := htmlquery.FindOne(history, "./td[1]/span")
+			if date != nil {
+				priceHistory.Date = strings.TrimSpace(htmlquery.InnerText(date))
+			}
+			event := htmlquery.FindOne(history, "./td[2]/span")
+			if event != nil {
+				priceHistory.Event = strings.TrimSpace(htmlquery.InnerText(event))
+			}
+			price := htmlquery.FindOne(history, "./td[3]/span[1]")
+			if price != nil {
+				priceHistory.Price = strings.TrimSpace(htmlquery.InnerText(price))
+
+			}
+			source := htmlquery.FindOne(history, "./following-sibling::tr[1]//span[contains(text(), \"Source\")]")
+			priceHistory.Source = htmlquery.InnerText(source)
+			priceHistory.Maindb3ID = zc.CrawlerTables.Maindb3.ID
+			priceHistory.Address = zc.CrawlerTables.ZillowData.Address
+			zc.CrawlerTables.ZillowPriceHistory = append(zc.CrawlerTables.ZillowPriceHistory, priceHistory)
+		}
+	}
+}
+
+func (zc *ZillowCrawler) ParseZillowPublicTaxHistory(doc *html.Node) {
+	publicTaxHistories := htmlquery.Find(doc, "//h5[contains(text(), \"Public tax history\")]/following-sibling::table/tbody/tr")
+	if publicTaxHistories != nil {
+		for _, history := range publicTaxHistories {
+			publicTaxHistory := &entity.ZillowPublicTaxHistory{}
+			year := htmlquery.FindOne(history, "./td[1]")
+			if year != nil {
+				publicTaxHistory.Year = strings.TrimSpace(htmlquery.InnerText(year))
+			}
+			propertyTax := htmlquery.FindOne(history, "./td[2]")
+			if propertyTax != nil {
+				publicTaxHistory.PropertyTaxes = strings.TrimSpace(htmlquery.InnerText(propertyTax))
+			}
+			taxAssessment := htmlquery.FindOne(history, "./td[3]")
+			if taxAssessment != nil {
+				publicTaxHistory.TaxAssessment = strings.TrimSpace(htmlquery.InnerText(taxAssessment))
+			}
+			publicTaxHistory.Maindb3ID = zc.CrawlerTables.Maindb3.ID
+			publicTaxHistory.Address = zc.CrawlerTables.ZillowData.Address
+			zc.CrawlerTables.ZillowPublicTaxHistory = append(zc.CrawlerTables.ZillowPublicTaxHistory, publicTaxHistory)
+		}
 	}
 }
