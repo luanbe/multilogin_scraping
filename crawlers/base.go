@@ -117,9 +117,11 @@ func (bs *BaseSelenium) StartSelenium(profileName string) error {
 	bs.Profile = ps
 	return nil
 }
-func (bs *BaseSelenium) StopSelenium() error {
-	if err := bs.WebDriver.Quit(); err != nil {
-		return err
+func (bs *BaseSelenium) StopSessionBrowser(browserQuit bool) error {
+	if browserQuit == true {
+		if err := bs.WebDriver.Quit(); err != nil {
+			return err
+		}
 	}
 	time.Sleep(3 * time.Second)
 	if err := bs.Profile.DeleteProfile(); err != nil {

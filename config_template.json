@@ -11,10 +11,10 @@
     "driver": "mysql",
     "host": "127.0.0.1",
     "port": 40000,
-    "username": "crawler_admin",
-    "password": "Mlbd6460?",
+    "username": "root",
+    "password": "crawler",
     "dbname": "multilogin_crawler",
-    "debug": true
+    "logger_level": "silent"
   },
   "session": {
     "auth_user_key": "luabbe68"
@@ -24,6 +24,7 @@
     "zillow_crawler": {
       "no_browsers": 10,
       "log_file": "./logs/zillow_crawler.log",
+      "crawl_next_second": 5,
       "periodic_run":"2m",
       "periodic_interval": "10m",
       "days_interval": 30,
