@@ -33,6 +33,8 @@ type ZillowCrawler struct {
 	CrawlerServices  CrawlerServices
 	Logger           *zap.Logger
 	OnlyHistoryTable bool
+	CrawlerBlocked   bool
+	BrowserTurnOff   bool
 }
 
 type CrawlerTables struct {
@@ -52,7 +54,6 @@ const searchURL = "https://www.zillow.com/search/GetSearchPageState.htm?searchQu
 
 func NewZillowCrawler(
 	c *colly.Collector,
-	maindb3 *entity.Maindb3,
 	zillowService service.ZillowService,
 	maindb3Service service.Maindb3Service,
 	logger *zap.Logger,
@@ -77,7 +78,7 @@ func NewZillowCrawler(
 		Profile:   BaseSel.Profile,
 		CZillow:   c,
 		CrawlerTables: &CrawlerTables{
-			maindb3,
+			&entity.Maindb3{},
 			&entity.ZillowData{},
 			[]*entity.ZillowPriceHistory{},
 			[]*entity.ZillowPublicTaxHistory{},
@@ -85,6 +86,8 @@ func NewZillowCrawler(
 		CrawlerServices:  CrawlerServices{zillowService, maindb3Service},
 		Logger:           logger,
 		OnlyHistoryTable: onlyHistoryTable,
+		CrawlerBlocked:   false,
+		BrowserTurnOff:   false,
 	}, nil
 }
 
@@ -102,32 +105,53 @@ func (zc *ZillowCrawler) ShowLogInfo(mes string) {
 	zc.Logger.Info(mes, zap.Uint64("mainDBID", zc.CrawlerTables.Maindb3.ID), zap.String("URL", zc.GetURLCrawling()))
 }
 
-func (zc *ZillowCrawler) RunZillowCrawler(exactAddress bool) error {
-	defer zc.BaseSel.StopSelenium()
-	// Crawling exact address
-	if exactAddress == true {
-		zc.CrawlerTables.ZillowData.URL = zc.GetURLCrawling()
-		if err := zc.CrawlAddress(zc.CrawlerTables.ZillowData.URL); err != nil {
+func (zc *ZillowCrawler) RunZillowCrawler() error {
+	for {
+		maindb3List := []*entity.Maindb3{}
+		err := error(nil)
+
+		if zc.OnlyHistoryTable == true {
+			maindb3List, err = zc.CrawlerServices.Maindb3Service.ListMaindb3IntervalData(
+				viper.GetInt("crawler.zillow_crawler.days_interval"),
+				viper.GetString("crawler.crawler_status.succeeded"),
+				1000,
+			)
+		} else {
+			maindb3List, err = zc.CrawlerServices.Maindb3Service.ListMaindb3Data(
+				viper.GetString("crawler.crawler_status.succeeded"),
+				1000,
+			)
+		}
+
+		if err != nil {
+			return err
+		}
+		if len(maindb3List) < 1 {
+			return fmt.Errorf("Not found maindb3 data")
+		}
+		err = func() error {
+			for _, maindb3 := range maindb3List {
+				zc.CrawlerTables.Maindb3 = maindb3
+				zc.CrawlerTables.ZillowData = &entity.ZillowData{}
+				zc.ShowLogInfo("Zillow Data is crawling...")
+				zc.CrawlerTables.ZillowData.URL = zc.GetURLCrawling()
+				if err := zc.CrawlAddress(zc.CrawlerTables.ZillowData.URL); err != nil {
+					return err
+				}
+				zc.ShowLogInfo("Completed to crawl data")
+				time.Sleep(time.Second * viper.GetDuration("crawler.zillow_crawler.crawl_next_second"))
+			}
+			return nil
+		}()
+		if err != nil {
 			return err
 		}
 	}
-	// defer zc.BaseSel.StopSelenium()
-	//if err := zc.WebDriver.Get(url); err != nil {
-	//	log.Fatalln(err)
-	//}
-	//pageSource, err := zc.WebDriver.PageSource()
-	//if err != nil {
-	//	log.Fatalln(err)
-	//}
-	//zc.CheckVerifyHuman(pageSource)
-	//zc.CrawlData(zc.CrawlMapBounds(pageSource))
-	//fmt.Println(zc.WebDriver.GetCookies())
-	return nil
 }
 
 func (zc *ZillowCrawler) CheckVerifyHuman(pageSource string) error {
 	if strings.Contains(pageSource, "Please verify you're a human to continue") {
-		return fmt.Errorf("the website blocked crawler")
+		return fmt.Errorf("Crawler blocked for checking verify hunman")
 	}
 	return nil
 }
@@ -265,9 +289,11 @@ func (zc *ZillowCrawler) CrawlAddress(address string) error {
 	time.Sleep(10 * time.Second)
 	pageSource, err := zc.WebDriver.PageSource()
 	if err != nil {
+		zc.BrowserTurnOff = true
 		return err
 	}
 	if err := zc.CheckVerifyHuman(pageSource); err != nil {
+		zc.CrawlerBlocked = true
 		return err
 	}
 	if err := zc.ParseData(pageSource); err != nil {
@@ -277,18 +303,20 @@ func (zc *ZillowCrawler) CrawlAddress(address string) error {
 		if err := zc.UpdateZillowDB(); err != nil {
 			return err
 		}
+		zc.ShowLogInfo("Added/Updated record to Zillow Table")
 	}
 
 	if err := zc.UpdateZillowPriceHistoryDB(); err != nil {
 		return err
 	}
+	zc.ShowLogInfo("Added/Updated record to Price History Table")
 	if err := zc.UpdateZillowPublicTaxHistoryDB(); err != nil {
 		return err
 	}
+	zc.ShowLogInfo("Added/Updated record to Public Taxt History Table")
 	if err := zc.UpdateMaindb3DB(); err != nil {
 		return err
 	}
-
 	return nil
 }
 

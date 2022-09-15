@@ -2,11 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/go-co-op/gocron"
 	"github.com/hibiken/asynq"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"gorm.io/gorm"
 	"log"
 	"multilogin_scraping/initialization"
 	"multilogin_scraping/tasks"
@@ -46,15 +44,7 @@ func main() {
 	// Int Router
 	router := initialization.InitRouting(db, sessionManager)
 
-	if viper.GetBool("crawler.workers.redis_task") == true {
-		if err := RedisPeriodicTasks(logger); err != nil {
-			logger.Fatal(fmt.Sprintf("could not create periodic task: %v", err))
-		}
-	} else {
-		if err := PeriodicTasks(db, logger); err != nil {
-			logger.Fatal(fmt.Sprintf("could not create periodic task: %v", err))
-		}
-	}
+	tasks.RunCrawler(db, logger)
 
 	logger.Info(fmt.Sprintf("Server START on port%v", viper.GetString("server.address")))
 	log.Fatal(http.ListenAndServe(
@@ -95,17 +85,17 @@ func RedisPeriodicTasks(logger *zap.Logger) error {
 	return nil
 }
 
-func PeriodicTasks(db *gorm.DB, logger *zap.Logger) error {
-	s := gocron.NewScheduler(time.UTC)
-	s.SetMaxConcurrentJobs(viper.GetInt("crawler.workers.concurrent"), gocron.RescheduleMode)
-	_, err := s.Every(viper.GetString("crawler.zillow_crawler.periodic_run")).Do(tasks.RunCrawler, db, logger)
-	if err != nil {
-		return err
-	}
-	_, err = s.Every(viper.GetString("crawler.zillow_crawler.periodic_interval")).Do(tasks.RunCrawlerInterval, db, logger)
-	if err != nil {
-		return err
-	}
-	s.StartAsync()
-	return nil
-}
+//func PeriodicTasks(db *gorm.DB, logger *zap.Logger) error {
+//	s := gocron.NewScheduler(time.UTC)
+//	s.SetMaxConcurrentJobs(viper.GetInt("crawler.workers.concurrent"), gocron.RescheduleMode)
+//	_, err := s.Every(viper.GetString("crawler.zillow_crawler.periodic_run")).Do(tasks.RunCrawler, db, logger)
+//	if err != nil {
+//		return err
+//	}
+//	_, err = s.Every(viper.GetString("crawler.zillow_crawler.periodic_interval")).Do(tasks.RunCrawlerInterval, db, logger)
+//	if err != nil {
+//		return err
+//	}
+//	s.StartAsync()
+//	return nil
+//}

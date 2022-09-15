@@ -2,6 +2,10 @@ package database
 
 import (
 	"fmt"
+	"github.com/spf13/viper"
+	"gorm.io/gorm/logger"
+	"log"
+	"os"
 	"time"
 
 	"gorm.io/driver/mysql"
@@ -12,11 +16,34 @@ import (
 )
 
 func NewConnectionDB(driverDB string, database string, host string, user string, password string, port int) (*gorm.DB, error) {
+	var logLevel logger.LogLevel
+	switch viper.GetString("database.logger_level") {
+	case "error":
+		logLevel = logger.Error
+	case "warn":
+		logLevel = logger.Warn
+	case "silent":
+		logLevel = logger.Silent
+	default:
+		logLevel = logger.Info
+	}
+
+	newLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
+		logger.Config{
+			SlowThreshold:             time.Second, // Slow SQL threshold
+			LogLevel:                  logLevel,    // Log level
+			IgnoreRecordNotFoundError: true,        // Ignore ErrRecordNotFound error for logger
+			Colorful:                  true,        // Disable color
+		},
+	)
+
 	var dialect gorm.Dialector
 	gormConfig := &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
 			SingularTable: false,
 		},
+		Logger: newLogger,
 	}
 
 	if driverDB == "postgres" {
