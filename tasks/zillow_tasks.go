@@ -1,16 +1,16 @@
 package tasks
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/gocolly/colly"
 	"github.com/hibiken/asynq"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
+	"multilogin_scraping/app/models/entity"
 	"multilogin_scraping/app/registry"
 	"multilogin_scraping/crawlers/zillow"
-	"time"
+	"sync"
 )
 
 const (
@@ -36,122 +36,72 @@ func NewZillowRedisTask() (*asynq.Task, error) {
 	}
 	return asynq.NewTask(TypeZillowCrawler, payload), nil
 }
-func (processor *ZillowProcessor) ZillowRedisProcessTask(ctx context.Context, t *asynq.Task) error {
 
-	var p ZillowCrawlerPayload
-	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("json.Unmarshal failed: %v: %w", err, asynq.SkipRetry)
-	}
-	RunCrawler(processor.DB, processor.Logger)
-	return nil
-}
-
-func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger) {
+func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger, onlyHistoryTable bool) {
 	c := colly.NewCollector()
 	maindb3Service := registry.RegisterMaindb3Service(db)
 	zillowService := registry.RegisterZillowService(db)
+	var wg sync.WaitGroup
+	//noBrowser := viper.GetInt("crawler.zillow_crawler.no_browsers")
+	// TODO: We will add more browsers later when finding the method query multiple records at per concurrency
+	noBrowser := viper.GetInt("crawler.zillow_crawler.periodic_browser")
+	recordSize := viper.GetInt("crawler.zillow_crawler.periodic_record_size")
+	if onlyHistoryTable == true {
+		noBrowser = viper.GetInt("crawler.zillow_crawler.periodic_browser_interval")
+		recordSize = viper.GetInt("crawler.zillow_crawler.periodic_record_size_interval")
+	}
 
-	go func() {
-		for {
-			zillowCrawler, err := zillow.NewZillowCrawler(c, zillowService, maindb3Service, zillowLogger, false)
-			if err != nil {
-				zillowLogger.Error(err.Error())
-				time.Sleep(time.Second * 5)
-				continue
-			}
-			defer zillowCrawler.BaseSel.StopSessionBrowser(true)
-			if err := zillowCrawler.RunZillowCrawler(); err != nil {
-				zillowCrawler.ShowLogError(err.Error())
-				zillowCrawler.BaseSel.StopSessionBrowser(false)
-				if zillowCrawler.CrawlerBlocked == true {
-					continue
-				}
-				if zillowCrawler.BrowserTurnOff == true {
-					continue
-				}
-				break
-			}
+	wg.Add(noBrowser)
+	page := 0
+	pageSize := recordSize / noBrowser
+	for i := 0; i < noBrowser; i++ {
+		page += 1
+		maindb3DataList := []*entity.Maindb3{}
+		err := error(nil)
+		if onlyHistoryTable == true {
+			maindb3DataList, err = maindb3Service.ListMaindb3IntervalData(
+				viper.GetInt("crawler.zillow_crawler.days_interval"),
+				viper.GetString("crawler.crawler_status.succeeded"),
+				page,
+				pageSize,
+			)
+		} else {
+			maindb3DataList, err = maindb3Service.ListMaindb3Data(
+				viper.GetString("crawler.crawler_status.succeeded"),
+				page,
+				pageSize,
+			)
 		}
-	}()
-	//
-	//}
-	//for {
-	//	zillowCrawler, err := zillow.NewZillowCrawler(c, zillowService, maindb3Service, zillowLogger, true)
-	//	if err != nil {
-	//		zillowLogger.Error(err.Error())
-	//		time.Sleep(time.Second * 5)
-	//		continue
-	//	}
-	//	defer zillowCrawler.BaseSel.StopSessionBrowser(true)
-	//	if err := zillowCrawler.RunZillowCrawler(); err != nil {
-	//		zillowCrawler.ShowLogError(err.Error())
-	//		zillowCrawler.BaseSel.StopSessionBrowser(false)
-	//		if zillowCrawler.CrawlerBlocked == true {
-	//			continue
-	//		}
-	//		if zillowCrawler.BrowserTurnOff == true {
-	//			continue
-	//		}
-	//		break
-	//	}
 
+		if err != nil {
+			zillowLogger.Error(err.Error())
+		}
+		if maindb3DataList == nil || len(maindb3DataList) < 1 {
+			zillowLogger.Info("Not found maindb3 data")
+			return
+		}
+		go func(maindb3DataList []*entity.Maindb3, wg *sync.WaitGroup) {
+			defer wg.Done()
+			for {
+				zillowCrawler, err := zillow.NewZillowCrawler(c, maindb3DataList, zillowService, maindb3Service, zillowLogger, onlyHistoryTable)
+				if err != nil {
+					zillowLogger.Error(err.Error())
+					continue
+				}
+				if err := zillowCrawler.RunZillowCrawler(); err != nil {
+					zillowCrawler.ShowLogError(err.Error())
+					zillowCrawler.BaseSel.StopSessionBrowser(true)
+					if zillowCrawler.CrawlerBlocked == true {
+						continue
+					}
+					if zillowCrawler.BrowserTurnOff == true {
+						continue
+					}
+					break
+				}
+			}
+		}(maindb3DataList, &wg)
+	}
+	wg.Wait()
+	zillowLogger.Info("Stopped crawler!")
 }
-
-//func RunCrawlerInterval(db *gorm.DB, zillowLogger *zap.Logger) {
-//	c := colly.NewCollector()
-//
-//	maindb3Service := registry.RegisterMaindb3Service(db)
-//	zillowService := registry.RegisterZillowService(db)
-//	// Comment this for testing ID
-//	maindb3List, err := maindb3Service.ListMaindb3IntervalData(
-//		viper.GetInt("crawler.zillow_crawler.days_interval"),
-//		viper.GetString("crawler.crawler_status.succeeded"),
-//		viper.GetInt("crawler.zillow_crawler.no_browsers_interval"),
-//	)
-//	if err != nil {
-//		zillowLogger.Error(err.Error())
-//		return
-//	}
-//	var m sync.Mutex
-//	for _, maindb3 := range maindb3List {
-//		go RunZillowCrawler(c, maindb3, zillowService, maindb3Service, zillowLogger, &m, true)
-//	}
-//	if len(maindb3List) > 0 {
-//		defer zillowLogger.Info("Completed to crawl & updated history table", zap.Int("No.Addresses", len(maindb3List)))
-//	}
-//
-//	//NOTE: This is for testing data by id
-//	//maindb3, err := maindb3Service.GetMaindb3(1)
-//	//if err != nil {
-//	//	zillowLogger.Error(err.Error())
-//	//	return
-//	//}
-//	//var m sync.Mutex
-//	//go RunZillowCrawler(c, maindb3, zillowService, maindb3Service, zillowLogger, &m)
-//
-//}
-
-//func RunZillowCrawler(
-//	c *colly.Collector,
-//	maindb3 *entity.Maindb3,
-//	zillowService service.ZillowService,
-//	maindb3Service service.Maindb3Service,
-//	logger *zap.Logger,
-//	m *sync.Mutex,
-//	onlyHistoryTable bool,
-//) {
-//	cZillow := c.Clone()
-//	m.Lock()
-//	zillowCrawler, err := zillow.NewZillowCrawler(cZillow, maindb3, zillowService, maindb3Service, logger, onlyHistoryTable)
-//	if err != nil {
-//		logger.Error(err.Error(), zap.Uint64("mainDBID", maindb3.ID))
-//		m.Unlock()
-//		return
-//	}
-//	m.Unlock()
-//	zillowCrawler.ShowLogInfo("Zillow Data is crawling...")
-//	if err := zillowCrawler.RunZillowCrawler(); err != nil {
-//		zillowCrawler.ShowLogError(err.Error())
-//	}
-//	zillowCrawler.ShowLogInfo("Zillow Data Crawled!")
-//}

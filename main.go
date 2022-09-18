@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/hibiken/asynq"
+	"github.com/go-co-op/gocron"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 	"log"
 	"multilogin_scraping/initialization"
 	"multilogin_scraping/tasks"
@@ -44,7 +45,9 @@ func main() {
 	// Int Router
 	router := initialization.InitRouting(db, sessionManager)
 
-	tasks.RunCrawler(db, logger)
+	if err := PeriodicTasks(db, logger); err != nil {
+		logger.Fatal(err.Error())
+	}
 
 	logger.Info(fmt.Sprintf("Server START on port%v", viper.GetString("server.address")))
 	log.Fatal(http.ListenAndServe(
@@ -53,49 +56,17 @@ func main() {
 	))
 }
 
-func RedisPeriodicTasks(logger *zap.Logger) error {
-	// Example of using America/Los_Angeles timezone instead of the default UTC timezone.
-	loc, err := time.LoadLocation("America/Los_Angeles")
-	if err != nil {
-		panic(err)
-	}
-	scheduler := asynq.NewScheduler(
-		asynq.RedisClientOpt{
-			Addr: viper.GetString("crawler.redis.address"),
-			DB:   viper.GetInt("crawler.redis.db"),
-		},
-		&asynq.SchedulerOpts{
-			Location: loc,
-		},
-	)
-	zillowCrawlerTask, err := tasks.NewZillowRedisTask()
+func PeriodicTasks(db *gorm.DB, logger *zap.Logger) error {
+	s := gocron.NewScheduler(time.UTC)
+	s.SetMaxConcurrentJobs(viper.GetInt("crawler.workers.concurrent"), gocron.RescheduleMode)
+	_, err := s.Every(viper.GetString("crawler.zillow_crawler.periodic_run")).SingletonMode().Do(tasks.RunCrawler, db, logger, false)
 	if err != nil {
 		return err
 	}
-	entryID, err := scheduler.Register(fmt.Sprint("@every ", viper.GetString("crawler.zillow_crawler.periodic_run")), zillowCrawlerTask)
+	_, err = s.Every(viper.GetString("crawler.zillow_crawler.periodic_interval")).SingletonMode().Do(tasks.RunCrawler, db, logger, true)
 	if err != nil {
 		return err
 	}
-	logger.Info(fmt.Sprintf("registered an entry: %q\n", entryID))
-
-	if err := scheduler.Run(); err != nil {
-		return err
-	}
-
+	s.StartAsync()
 	return nil
 }
-
-//func PeriodicTasks(db *gorm.DB, logger *zap.Logger) error {
-//	s := gocron.NewScheduler(time.UTC)
-//	s.SetMaxConcurrentJobs(viper.GetInt("crawler.workers.concurrent"), gocron.RescheduleMode)
-//	_, err := s.Every(viper.GetString("crawler.zillow_crawler.periodic_run")).Do(tasks.RunCrawler, db, logger)
-//	if err != nil {
-//		return err
-//	}
-//	_, err = s.Every(viper.GetString("crawler.zillow_crawler.periodic_interval")).Do(tasks.RunCrawlerInterval, db, logger)
-//	if err != nil {
-//		return err
-//	}
-//	s.StartAsync()
-//	return nil
-//}

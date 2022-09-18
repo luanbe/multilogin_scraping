@@ -6,10 +6,10 @@ import (
 )
 
 type Maindb3Service interface {
-	ListMaindb3Data(crawlingStatus string, limit int) ([]*entity.Maindb3, error)
+	ListMaindb3Data(crawlingStatus string, page, limit int) ([]*entity.Maindb3, error)
 	UpdateStatus(maindb3 *entity.Maindb3, status string) error
 	GetMaindb3(id int) (*entity.Maindb3, error)
-	ListMaindb3IntervalData(day int, crawlingStatus string, limit int) ([]*entity.Maindb3, error)
+	ListMaindb3IntervalData(day int, crawlingStatus string, page, limit int) ([]*entity.Maindb3, error)
 }
 
 type Maindb3ServiceImpl struct {
@@ -26,17 +26,17 @@ func NewMaindb3Service(
 	return &Maindb3ServiceImpl{baseRepo, maindb3Repo}
 }
 
-func (s *Maindb3ServiceImpl) ListMaindb3Data(crawlingStatus string, limit int) ([]*entity.Maindb3, error) {
+func (s *Maindb3ServiceImpl) ListMaindb3Data(crawlingStatus string, page, limit int) ([]*entity.Maindb3, error) {
 	//s.baseRepo.BeginTx()
-	result, err := s.maindb3Repo.ListMaindb3(crawlingStatus, limit)
+	result, err := s.maindb3Repo.ListMaindb3(crawlingStatus, page, limit)
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
 }
-func (s *Maindb3ServiceImpl) ListMaindb3IntervalData(day int, crawlingStatus string, limit int) ([]*entity.Maindb3, error) {
+func (s *Maindb3ServiceImpl) ListMaindb3IntervalData(day int, crawlingStatus string, page, limit int) ([]*entity.Maindb3, error) {
 	//s.baseRepo.BeginTx()
-	result, err := s.maindb3Repo.ListMaindb3Interval(day, crawlingStatus, limit)
+	result, err := s.maindb3Repo.ListMaindb3Interval(day, crawlingStatus, page, limit)
 	if err != nil {
 		return nil, err
 	}
