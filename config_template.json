@@ -24,7 +24,7 @@
     "zillow_crawler": {
       "no_browsers": 10,
       "log_file": "./logs/zillow_crawler.log",
-      "crawl_next_second": 5,
+      "crawl_next_time": 5,
       "periodic_run":"2m",
       "periodic_interval": "10m",
       "days_interval": 30,

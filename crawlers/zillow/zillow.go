@@ -35,6 +35,7 @@ type ZillowCrawler struct {
 	OnlyHistoryTable bool
 	CrawlerBlocked   bool
 	BrowserTurnOff   bool
+	Maindb3List      []*entity.Maindb3
 }
 
 type CrawlerTables struct {
@@ -54,6 +55,7 @@ const searchURL = "https://www.zillow.com/search/GetSearchPageState.htm?searchQu
 
 func NewZillowCrawler(
 	c *colly.Collector,
+	maindb3List []*entity.Maindb3,
 	zillowService service.ZillowService,
 	maindb3Service service.Maindb3Service,
 	logger *zap.Logger,
@@ -88,6 +90,7 @@ func NewZillowCrawler(
 		OnlyHistoryTable: onlyHistoryTable,
 		CrawlerBlocked:   false,
 		BrowserTurnOff:   false,
+		Maindb3List:      maindb3List,
 	}, nil
 }
 
@@ -107,50 +110,33 @@ func (zc *ZillowCrawler) ShowLogInfo(mes string) {
 
 func (zc *ZillowCrawler) RunZillowCrawler() error {
 	for {
-		maindb3List := []*entity.Maindb3{}
-		err := error(nil)
-
-		if zc.OnlyHistoryTable == true {
-			maindb3List, err = zc.CrawlerServices.Maindb3Service.ListMaindb3IntervalData(
-				viper.GetInt("crawler.zillow_crawler.days_interval"),
-				viper.GetString("crawler.crawler_status.succeeded"),
-				1000,
-			)
-		} else {
-			maindb3List, err = zc.CrawlerServices.Maindb3Service.ListMaindb3Data(
-				viper.GetString("crawler.crawler_status.succeeded"),
-				1000,
-			)
-		}
-
-		if err != nil {
-			return err
-		}
-		if len(maindb3List) < 1 {
-			return fmt.Errorf("Not found maindb3 data")
-		}
-		err = func() error {
-			for _, maindb3 := range maindb3List {
+		err := func() error {
+			for _, maindb3 := range zc.Maindb3List {
 				zc.CrawlerTables.Maindb3 = maindb3
 				zc.CrawlerTables.ZillowData = &entity.ZillowData{}
 				zc.ShowLogInfo("Zillow Data is crawling...")
 				zc.CrawlerTables.ZillowData.URL = zc.GetURLCrawling()
 				if err := zc.CrawlAddress(zc.CrawlerTables.ZillowData.URL); err != nil {
-					return err
+					zc.ShowLogError(err.Error())
+					zc.ShowLogError("Failed to crawl data")
+					if err = zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerTables.Maindb3, viper.GetString("crawler.crawler_status.failed")); err != nil {
+						return err
+					}
 				}
 				zc.ShowLogInfo("Completed to crawl data")
-				time.Sleep(time.Second * viper.GetDuration("crawler.zillow_crawler.crawl_next_second"))
+				time.Sleep(time.Second * viper.GetDuration("crawler.zillow_crawler.crawl_next_time"))
 			}
 			return nil
 		}()
 		if err != nil {
 			return err
 		}
+		return nil
 	}
 }
 
 func (zc *ZillowCrawler) CheckVerifyHuman(pageSource string) error {
-	if strings.Contains(pageSource, "Please verify you're a human to continue") {
+	if strings.Contains(pageSource, "Please verify you're a human to continue") || strings.Contains(pageSource, "Let's confirm you are human") {
 		return fmt.Errorf("Crawler blocked for checking verify hunman")
 	}
 	return nil
@@ -286,7 +272,7 @@ func (zc *ZillowCrawler) CrawlAddress(address string) error {
 		return err
 	}
 	// NOTE: time to load source. Need to increase if data was not showing
-	time.Sleep(10 * time.Second)
+	time.Sleep(viper.GetDuration("crawler.zillow_crawler.time_load_source") * time.Second)
 	pageSource, err := zc.WebDriver.PageSource()
 	if err != nil {
 		zc.BrowserTurnOff = true
@@ -801,7 +787,7 @@ func (zc *ZillowCrawler) ParseCentralAir(doc *html.Node) {
 }
 
 func (zc *ZillowCrawler) ParseGarageSpaces(doc *html.Node) {
-	garageSpaces := htmlquery.FindOne(doc, "//*[contains(text(), \"garage spaces\")]/text()")
+	garageSpaces := htmlquery.FindOne(doc, "//h4[contains(text(), \"Facts and features\")]/following-sibling::div//*[contains(text(), \"garage spaces\") or contains(text(), \"Garage spaces\") or contains(text(), \"Garage Spaces\")]/text()")
 	if garageSpaces != nil {
 		zc.CrawlerTables.ZillowData.OfGarageSpaces = strings.TrimSpace(strings.Replace(garageSpaces.Data, " garage spaces", "", -1))
 	}

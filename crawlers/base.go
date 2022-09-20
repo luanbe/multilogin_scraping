@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/tebeka/selenium/firefox"
 	"go.uber.org/zap"
 	util "multilogin_scraping/pkg/utils"
 	"net/http"
@@ -106,7 +107,7 @@ func (bs *BaseSelenium) StartSelenium(profileName string) error {
 	time.Sleep(3 * time.Second)
 	selenium.SetDebug(viper.GetBool("crawler.debug"))
 	caps := selenium.Capabilities{}
-
+	caps.AddFirefox(firefox.Capabilities{Args: []string{"--headless"}})
 	// Connect to Selenium
 	wd, err := selenium.NewRemote(caps, ps.Value)
 	if err != nil {
@@ -118,12 +119,13 @@ func (bs *BaseSelenium) StartSelenium(profileName string) error {
 	return nil
 }
 func (bs *BaseSelenium) StopSessionBrowser(browserQuit bool) error {
+	bs.logger.Info(fmt.Sprint("Stop crawler & delete profile on Multilogin App: ", bs.Profile.UUID))
 	if browserQuit == true {
 		if err := bs.WebDriver.Quit(); err != nil {
 			return err
 		}
 	}
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 	if err := bs.Profile.DeleteProfile(); err != nil {
 		return err
 	}

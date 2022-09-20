@@ -42,7 +42,7 @@ func (s *ZillowServiceImpl) UpdateZillow(zillowData *entity.ZillowData, id uint6
 }
 
 func (s *ZillowServiceImpl) GetZillow(id uint64) (*entity.ZillowData, error) {
-	zillowData, err := s.zillowRepo.GetZillowFirst(map[string]interface{}{"id": id})
+	zillowData, err := s.zillowRepo.GetZillowFirst(map[string]interface{}{"maindb3_id": id})
 	if err != nil && err.Error() != "record not found" {
 		return nil, err
 	}
