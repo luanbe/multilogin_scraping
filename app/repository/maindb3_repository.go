@@ -27,7 +27,14 @@ func (r Maindb3RepositoryImpl) ListMaindb3(crawlingStatus string, page, pageSize
 	}
 	offset := (page - 1) * pageSize
 	db := r.base.GetDB()
-	err := db.Offset(offset).Limit(pageSize).Where("crawling_status != ?", crawlingStatus).Or("crawling_status is NULL").Find(&items).Error
+	query := db.Offset(offset).Limit(pageSize)
+	if crawlingStatus != "" {
+		query = query.Where("crawling_status = ?", crawlingStatus)
+	} else {
+		query = query.Where("crawling_status is NULL")
+	}
+	err := query.Find(&items).Error
+
 	if err != nil {
 		return nil, err
 	}

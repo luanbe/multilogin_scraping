@@ -2,10 +2,14 @@ package initialization
 
 import (
 	"encoding/gob"
+	"errors"
+	"fmt"
 	"github.com/alexedwards/scs/v2"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -54,7 +58,7 @@ func InitDb() (*gorm.DB, error) {
 	return db, nil
 }
 
-func InitLogger(InitFields map[string]interface{}, LogFilePath string) *zap.Logger {
+func InitLogger(InitFields map[string]interface{}, LogFile string) *zap.Logger {
 
 	cfg := zap.NewProductionConfig()
 	cfg.EncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
@@ -66,14 +70,24 @@ func InitLogger(InitFields map[string]interface{}, LogFilePath string) *zap.Logg
 
 	cfg.OutputPaths = []string{"stdout"}
 	cfg.ErrorOutputPaths = []string{"stdout", "stderr"}
-	if LogFilePath != "" {
-		cfg.ErrorOutputPaths = append(cfg.ErrorOutputPaths, LogFilePath)
+	if LogFile != "" {
+		logFolder := "./logs"
+		if _, err := os.Stat(logFolder); errors.Is(err, os.ErrNotExist) {
+			err := os.Mkdir(logFolder, os.ModePerm)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+		cfg.OutputPaths = append(cfg.OutputPaths, fmt.Sprint(logFolder, "/", LogFile))
+		//cfg.ErrorOutputPaths = append(cfg.ErrorOutputPaths, fmt.Sprint(logFolder, "/", LogFile))
 	}
 
-	logger, _ := cfg.Build()
+	logger, err := cfg.Build()
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer logger.Sync()
 	return logger
-
 }
 
 // IntSessionManager function create session manager and int configuration

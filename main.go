@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/go-co-op/gocron"
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"log"
 	"multilogin_scraping/initialization"
@@ -29,7 +28,7 @@ func main() {
 	// Init Logger
 	logger := initialization.InitLogger(
 		map[string]interface{}{"Logger": "System"},
-		"",
+		"system.log",
 	)
 
 	// Init Db connection
@@ -45,7 +44,7 @@ func main() {
 	// Int Router
 	router := initialization.InitRouting(db, sessionManager)
 
-	if err := PeriodicTasks(db, logger); err != nil {
+	if err := PeriodicTasks(db); err != nil {
 		logger.Fatal(err.Error())
 	}
 
@@ -56,17 +55,22 @@ func main() {
 	))
 }
 
-func PeriodicTasks(db *gorm.DB, logger *zap.Logger) error {
+func PeriodicTasks(db *gorm.DB) error {
 	s := gocron.NewScheduler(time.UTC)
+	zillowLogger := initialization.InitLogger(
+		map[string]interface{}{"Logger": "Zillow"},
+		"zillow.log",
+	)
+
 	s.SetMaxConcurrentJobs(viper.GetInt("crawler.workers.concurrent"), gocron.RescheduleMode)
-	_, err := s.Every(viper.GetString("crawler.zillow_crawler.periodic_run")).SingletonMode().Do(tasks.RunCrawler, db, logger, false)
+	_, err := s.Every(viper.GetString("crawler.zillow_crawler.periodic_run")).SingletonMode().Do(tasks.RunCrawler, db, zillowLogger, false)
 	if err != nil {
 		return err
 	}
-	_, err = s.Every(viper.GetString("crawler.zillow_crawler.periodic_interval")).SingletonMode().Do(tasks.RunCrawler, db, logger, true)
-	if err != nil {
-		return err
-	}
+	//_, err = s.Every(viper.GetString("crawler.zillow_crawler.periodic_interval")).SingletonMode().Do(tasks.RunCrawler, db, zillowLogger, true)
+	//if err != nil {
+	//	return err
+	//}
 	s.StartAsync()
 	return nil
 }

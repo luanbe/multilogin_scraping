@@ -117,7 +117,11 @@ func (zc *ZillowCrawler) RunZillowCrawler() error {
 				zc.ShowLogInfo("Zillow Data is crawling...")
 				zc.CrawlerTables.ZillowData.URL = zc.GetURLCrawling()
 				if err := zc.CrawlAddress(zc.CrawlerTables.ZillowData.URL); err != nil {
-					return err
+					zc.ShowLogError(err.Error())
+					zc.ShowLogError("Failed to crawl data")
+					if err = zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerTables.Maindb3, viper.GetString("crawler.crawler_status.failed")); err != nil {
+						return err
+					}
 				}
 				zc.ShowLogInfo("Completed to crawl data")
 				time.Sleep(time.Second * viper.GetDuration("crawler.zillow_crawler.crawl_next_time"))
@@ -127,17 +131,14 @@ func (zc *ZillowCrawler) RunZillowCrawler() error {
 		if err != nil {
 			return err
 		}
+		return nil
 	}
 }
 
 func (zc *ZillowCrawler) CheckVerifyHuman(pageSource string) error {
-	if strings.Contains(pageSource, "Please verify you're a human to continue") {
+	if strings.Contains(pageSource, "Please verify you're a human to continue") || strings.Contains(pageSource, "Let's confirm you are human") {
 		return fmt.Errorf("Crawler blocked for checking verify hunman")
 	}
-	if strings.Contains(pageSource, "Let's confirm you are human") {
-		return fmt.Errorf("Crawler blocked for checking verify hunman")
-	}
-
 	return nil
 }
 
@@ -786,7 +787,7 @@ func (zc *ZillowCrawler) ParseCentralAir(doc *html.Node) {
 }
 
 func (zc *ZillowCrawler) ParseGarageSpaces(doc *html.Node) {
-	garageSpaces := htmlquery.FindOne(doc, "//*[contains(text(), \"garage spaces\")]/text()")
+	garageSpaces := htmlquery.FindOne(doc, "//h4[contains(text(), \"Facts and features\")]/following-sibling::div//*[contains(text(), \"garage spaces\") or contains(text(), \"Garage spaces\") or contains(text(), \"Garage Spaces\")]/text()")
 	if garageSpaces != nil {
 		zc.CrawlerTables.ZillowData.OfGarageSpaces = strings.TrimSpace(strings.Replace(garageSpaces.Data, " garage spaces", "", -1))
 	}

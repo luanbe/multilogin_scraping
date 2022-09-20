@@ -119,7 +119,7 @@ func (bs *BaseSelenium) StartSelenium(profileName string) error {
 	return nil
 }
 func (bs *BaseSelenium) StopSessionBrowser(browserQuit bool) error {
-	bs.logger.Info(fmt.Sprint("Stop browser & delete profile on Multilogin App: ", bs.Profile.UUID))
+	bs.logger.Info(fmt.Sprint("Stop crawler & delete profile on Multilogin App: ", bs.Profile.UUID))
 	if browserQuit == true {
 		if err := bs.WebDriver.Quit(); err != nil {
 			return err

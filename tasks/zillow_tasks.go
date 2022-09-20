@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gocolly/colly"
 	"github.com/hibiken/asynq"
 	"github.com/spf13/viper"
@@ -67,7 +68,8 @@ func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger, onlyHistoryTable bool) {
 			)
 		} else {
 			maindb3DataList, err = maindb3Service.ListMaindb3Data(
-				viper.GetString("crawler.crawler_status.succeeded"),
+				//viper.GetString("crawler.crawler_status.failed"),
+				"",
 				page,
 				pageSize,
 			)
@@ -88,6 +90,7 @@ func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger, onlyHistoryTable bool) {
 					zillowLogger.Error(err.Error())
 					continue
 				}
+				zillowLogger.Info(fmt.Sprint("Start crawler on Multilogin App: ", zillowCrawler.BaseSel.Profile.UUID))
 				if err := zillowCrawler.RunZillowCrawler(); err != nil {
 					zillowCrawler.ShowLogError(err.Error())
 					zillowCrawler.BaseSel.StopSessionBrowser(true)
@@ -99,9 +102,11 @@ func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger, onlyHistoryTable bool) {
 					}
 					break
 				}
+				zillowCrawler.BaseSel.StopSessionBrowser(true)
+				break
 			}
 		}(maindb3DataList, &wg)
 	}
 	wg.Wait()
-	zillowLogger.Info("Stopped crawler!")
+	return
 }
