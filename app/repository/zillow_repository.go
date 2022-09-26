@@ -3,9 +3,9 @@ package repository
 import "multilogin_scraping/app/models/entity"
 
 type ZillowRepository interface {
-	AddZillow(Zillow *entity.ZillowData) error
-	GetZillowFirst(query map[string]interface{}) (*entity.ZillowData, error)
-	UpdateZillow(Zillow *entity.ZillowData, query map[string]interface{}) error
+	AddZillow(Zillow *entity.ZillowDetail) error
+	GetZillowFirst(query map[string]interface{}) (*entity.ZillowDetail, error)
+	UpdateZillow(Zillow *entity.ZillowDetail, query map[string]interface{}) error
 	GetZillowPriceHistoryFirst(query map[string]interface{}) (*entity.ZillowPriceHistory, error)
 	AddZillowPriceHistory(zillowHistory *entity.ZillowPriceHistory) error
 	GetZillowPublicTaxHistoryFirst(query map[string]interface{}) (*entity.ZillowPublicTaxHistory, error)
@@ -24,22 +24,22 @@ func NewZillowRepository(br BaseRepository) ZillowRepository {
 
 // }
 
-func (r *ZillowRepositoryImpl) AddZillow(zillow *entity.ZillowData) error {
+func (r *ZillowRepositoryImpl) AddZillow(zillow *entity.ZillowDetail) error {
 	if err := r.base.GetDB().Create(zillow).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *ZillowRepositoryImpl) UpdateZillow(zillow *entity.ZillowData, query map[string]interface{}) error {
+func (r *ZillowRepositoryImpl) UpdateZillow(zillow *entity.ZillowDetail, query map[string]interface{}) error {
 	if err := r.base.GetDB().Where(query).Updates(zillow).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *ZillowRepositoryImpl) GetZillowFirst(query map[string]interface{}) (*entity.ZillowData, error) {
-	var zillowData = &entity.ZillowData{}
+func (r *ZillowRepositoryImpl) GetZillowFirst(query map[string]interface{}) (*entity.ZillowDetail, error) {
+	var zillowData = &entity.ZillowDetail{}
 	if err := r.base.GetDB().Where(query).First(zillowData).Error; err != nil {
 		return nil, err
 	}

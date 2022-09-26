@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/tebeka/selenium/firefox"
 	"go.uber.org/zap"
-	util "multilogin_scraping/pkg/utils"
+	util2 "multilogin_scraping/pkg/utils"
 	"net/http"
 	"time"
 
@@ -40,9 +39,9 @@ func (ps *Profile) CreateProfile() error {
 	//browsers := []string{"stealthfox", "mimic"}
 	browsers := []string{"stealthfox"}
 	values := &map[string]string{
-		"name":    fmt.Sprint(ps.Name, "-Crawler-", util.RandInt()),
-		"os":      util.RandSliceStr(oses),
-		"browser": util.RandSliceStr(browsers),
+		"name":    fmt.Sprint(ps.Name, "-Crawler-", util2.RandInt()),
+		"os":      util2.RandSliceStr(oses),
+		"browser": util2.RandSliceStr(browsers),
 	}
 	jsonData, err := json.Marshal(values)
 
@@ -107,7 +106,7 @@ func (bs *BaseSelenium) StartSelenium(profileName string) error {
 	time.Sleep(3 * time.Second)
 	selenium.SetDebug(viper.GetBool("crawler.debug"))
 	caps := selenium.Capabilities{}
-	caps.AddFirefox(firefox.Capabilities{Args: []string{"--headless"}})
+	//caps.AddFirefox(firefox.Capabilities{Args: []string{"--headless", "--no-sandbox"}})
 	// Connect to Selenium
 	wd, err := selenium.NewRemote(caps, ps.Value)
 	if err != nil {
@@ -130,4 +129,12 @@ func (bs *BaseSelenium) StopSessionBrowser(browserQuit bool) error {
 		return err
 	}
 	return nil
+}
+
+func (bs *BaseSelenium) GetHttpCookies() ([]*http.Cookie, error) {
+	seleniumCookies, err := bs.WebDriver.GetCookies()
+	if err != nil {
+		return nil, err
+	}
+	return util2.ConvertSeleniumToHttpCookies(seleniumCookies), nil
 }

@@ -8,7 +8,7 @@ import (
 )
 
 // TODO: Use swagger later
-type ZillowData struct {
+type ZillowDetail struct {
 	base.BaseIDModel
 	Maindb3ID                  uint64    `gorm:"column:maindb3_id; unique" json:"maindb3_id"`
 	URL                        string    `gorm:"type:text" json:"url"`
@@ -113,11 +113,7 @@ type ZillowPublicTaxHistory struct {
 	TaxAssessment string `gorm:"type:varchar(100)" json:"tax_assessment"`
 }
 
-func (ZillowData) TableName() string {
-	return "zillow"
-}
-
-func (base *ZillowData) BeforeCreate(tx *gorm.DB) error {
+func (base *ZillowDetail) BeforeCreate(tx *gorm.DB) error {
 	tx.Statement.SetColumn("TimestampForDataExtraction", time.Now().In(util.Loc))
 	return nil
 }

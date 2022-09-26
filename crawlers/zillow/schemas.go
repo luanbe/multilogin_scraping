@@ -8,8 +8,8 @@ type MapBounds struct {
 }
 
 type SearchPageReq struct {
-	MapBounds    `json:"mapBounds"`
-	IsMapVisible bool `json:"isMapVisible"`
+	MapBounds    *MapBounds `json:"mapBounds"`
+	IsMapVisible bool       `json:"isMapVisible"`
 	FilterState  struct {
 		SortSelection struct {
 			Value string `json:"value"`
@@ -36,16 +36,16 @@ type SearchPageResResult struct {
 	StatusText            string      `json:"statusText"`
 	CountryCurrency       string      `json:"countryCurrency"`
 	Price                 string      `json:"price"`
-	UnformattedPrice      int         `json:"unformattedPrice"`
+	UnformattedPrice      float64     `json:"unformattedPrice"`
 	Address               string      `json:"address"`
 	AddressStreet         string      `json:"addressStreet"`
 	AddressCity           string      `json:"addressCity"`
 	AddressState          string      `json:"addressState"`
 	AddressZipcode        string      `json:"addressZipcode"`
 	IsUndisclosedAddress  bool        `json:"isUndisclosedAddress"`
-	Beds                  int         `json:"beds"`
-	Baths                 int         `json:"baths"`
-	Area                  int         `json:"area"`
+	Beds                  float64     `json:"beds"`
+	Baths                 float64     `json:"baths"`
+	Area                  float64     `json:"area"`
 	LatLong               struct {
 		Latitude  float64 `json:"latitude"`
 		Longitude float64 `json:"longitude"`
@@ -69,12 +69,12 @@ type SearchPageResResult struct {
 			Latitude        float64 `json:"latitude"`
 			Longitude       float64 `json:"longitude"`
 			Price           float64 `json:"price"`
-			Bathrooms       int     `json:"bathrooms"`
-			Bedrooms        int     `json:"bedrooms"`
+			Bathrooms       float64 `json:"bathrooms"`
+			Bedrooms        float64 `json:"bedrooms"`
 			LivingArea      float64 `json:"livingArea"`
 			HomeType        string  `json:"homeType"`
 			HomeStatus      string  `json:"homeStatus"`
-			DaysOnZillow    int     `json:"daysOnZillow"`
+			DaysOnZillow    float64 `json:"daysOnZillow"`
 			IsFeatured      bool    `json:"isFeatured"`
 			ShouldHighlight bool    `json:"shouldHighlight"`
 			Zestimate       float64 `json:"zestimate"`
@@ -101,7 +101,7 @@ type SearchPageResResult struct {
 	IsUserConfirmedClaim       bool        `json:"isUserConfirmedClaim"`
 	Pgapt                      string      `json:"pgapt"`
 	Sgapt                      string      `json:"sgapt"`
-	Zestimate                  int         `json:"zestimate"`
+	Zestimate                  float64     `json:"zestimate"`
 	ShouldShowZestimateAsPrice bool        `json:"shouldShowZestimateAsPrice"`
 	Has3DModel                 bool        `json:"has3DModel"`
 	HasVideo                   bool        `json:"hasVideo"`
@@ -119,6 +119,96 @@ type SearchPageResResult struct {
 	BuilderName                string      `json:"builderName,omitempty"`
 	Info1String                string      `json:"info1String,omitempty"`
 	LotAreaString              string      `json:"lotAreaString,omitempty"`
+}
+
+type SearchPageResRelaxedResult struct {
+	Zpid                 string      `json:"zpid"`
+	ID                   string      `json:"id"`
+	ProviderListingID    interface{} `json:"providerListingId"`
+	ImgSrc               string      `json:"imgSrc"`
+	HasImage             bool        `json:"hasImage"`
+	DetailURL            string      `json:"detailUrl"`
+	StatusType           string      `json:"statusType"`
+	StatusText           string      `json:"statusText"`
+	CountryCurrency      string      `json:"countryCurrency"`
+	Price                string      `json:"price"`
+	UnformattedPrice     float64     `json:"unformattedPrice"`
+	Address              string      `json:"address"`
+	AddressStreet        string      `json:"addressStreet"`
+	AddressCity          string      `json:"addressCity"`
+	AddressState         string      `json:"addressState"`
+	AddressZipcode       string      `json:"addressZipcode"`
+	IsUndisclosedAddress bool        `json:"isUndisclosedAddress"`
+	Beds                 float64     `json:"beds"`
+	Baths                float64     `json:"baths"`
+	Area                 float64     `json:"area"`
+	LatLong              struct {
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+	} `json:"latLong"`
+	IsZillowOwned bool `json:"isZillowOwned"`
+	VariableData  struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"variableData"`
+	BadgeInfo interface{} `json:"badgeInfo"`
+	HdpData   struct {
+		HomeInfo struct {
+			Zpid            int     `json:"zpid"`
+			StreetAddress   string  `json:"streetAddress"`
+			Zipcode         string  `json:"zipcode"`
+			City            string  `json:"city"`
+			State           string  `json:"state"`
+			Latitude        float64 `json:"latitude"`
+			Longitude       float64 `json:"longitude"`
+			Price           float64 `json:"price"`
+			Bathrooms       float64 `json:"bathrooms"`
+			Bedrooms        float64 `json:"bedrooms"`
+			LivingArea      float64 `json:"livingArea"`
+			HomeType        string  `json:"homeType"`
+			HomeStatus      string  `json:"homeStatus"`
+			DaysOnZillow    float64 `json:"daysOnZillow"`
+			IsFeatured      bool    `json:"isFeatured"`
+			ShouldHighlight bool    `json:"shouldHighlight"`
+			Zestimate       float64 `json:"zestimate"`
+			RentZestimate   float64 `json:"rentZestimate"`
+			ListingSubType  struct {
+				IsFSBA bool `json:"is_FSBA"`
+			} `json:"listing_sub_type"`
+			IsUnmappable            bool    `json:"isUnmappable"`
+			IsPreforeclosureAuction bool    `json:"isPreforeclosureAuction"`
+			HomeStatusForHDP        string  `json:"homeStatusForHDP"`
+			PriceForHDP             float64 `json:"priceForHDP"`
+			IsNonOwnerOccupied      bool    `json:"isNonOwnerOccupied"`
+			IsPremierBuilder        bool    `json:"isPremierBuilder"`
+			IsZillowOwned           bool    `json:"isZillowOwned"`
+			Currency                string  `json:"currency"`
+			Country                 string  `json:"country"`
+			TaxAssessedValue        float64 `json:"taxAssessedValue"`
+			LotAreaValue            float64 `json:"lotAreaValue"`
+			LotAreaUnit             string  `json:"lotAreaUnit"`
+		} `json:"homeInfo"`
+	} `json:"hdpData"`
+	IsSaved                    bool        `json:"isSaved"`
+	IsUserClaimingOwner        bool        `json:"isUserClaimingOwner"`
+	IsUserConfirmedClaim       bool        `json:"isUserConfirmedClaim"`
+	Pgapt                      string      `json:"pgapt"`
+	Sgapt                      string      `json:"sgapt"`
+	Zestimate                  float64     `json:"zestimate"`
+	ShouldShowZestimateAsPrice bool        `json:"shouldShowZestimateAsPrice"`
+	Has3DModel                 bool        `json:"has3DModel"`
+	HasVideo                   bool        `json:"hasVideo"`
+	IsHomeRec                  bool        `json:"isHomeRec"`
+	HasAdditionalAttributions  bool        `json:"hasAdditionalAttributions"`
+	IsFeaturedListing          bool        `json:"isFeaturedListing"`
+	AvailabilityDate           interface{} `json:"availabilityDate"`
+	Relaxed                    bool        `json:"relaxed"`
+	Ma                         bool        `json:"ma"`
+	HasOpenHouse               bool        `json:"hasOpenHouse,omitempty"`
+	OpenHouseStartDate         string      `json:"openHouseStartDate,omitempty"`
+	OpenHouseEndDate           string      `json:"openHouseEndDate,omitempty"`
+	OpenHouseDescription       string      `json:"openHouseDescription,omitempty"`
+	BrokerName                 string      `json:"brokerName,omitempty"`
 }
 
 type SearchPageRes struct {
@@ -153,13 +243,13 @@ type SearchPageRes struct {
 	RequestID int `json:"requestId"`
 	Cat1      struct {
 		SearchResults struct {
-			ListResults        []SearchPageResResult `json:"listResults"`
-			ResultsHash        string                `json:"resultsHash"`
-			HomeRecCount       int                   `json:"homeRecCount"`
-			ShowForYouCount    int                   `json:"showForYouCount"`
-			MapResults         []interface{}         `json:"mapResults"`
-			RelaxedResults     []interface{}         `json:"relaxedResults"`
-			RelaxedResultsHash string                `json:"relaxedResultsHash"`
+			ListResults        []SearchPageResResult        `json:"listResults"`
+			ResultsHash        string                       `json:"resultsHash"`
+			HomeRecCount       int                          `json:"homeRecCount"`
+			ShowForYouCount    int                          `json:"showForYouCount"`
+			MapResults         []interface{}                `json:"mapResults"`
+			RelaxedResults     []SearchPageResRelaxedResult `json:"relaxedResults"`
+			RelaxedResultsHash string                       `json:"relaxedResultsHash"`
 		} `json:"searchResults"`
 		SearchList struct {
 			ExpansionDistance  int         `json:"expansionDistance"`
