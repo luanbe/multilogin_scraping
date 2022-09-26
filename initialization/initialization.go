@@ -47,8 +47,8 @@ func InitDb() (*gorm.DB, error) {
 	// Define auto migration here
 	_ = db.AutoMigrate(
 		&entity.User{},
-		&entity.Maindb3{},
-		&entity.ZillowData{},
+		&entity.ZillowMaindb3Address{},
+		&entity.ZillowDetail{},
 		&entity.ZillowPublicTaxHistory{},
 		&entity.ZillowPriceHistory{},
 	)

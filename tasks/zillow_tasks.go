@@ -57,7 +57,7 @@ func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger, onlyHistoryTable bool) {
 	pageSize := recordSize / noBrowser
 	for i := 0; i < noBrowser; i++ {
 		page += 1
-		maindb3DataList := []*entity.Maindb3{}
+		maindb3DataList := []*entity.ZillowMaindb3Address{}
 		err := error(nil)
 		if onlyHistoryTable == true {
 			maindb3DataList, err = maindb3Service.ListMaindb3IntervalData(
@@ -82,7 +82,7 @@ func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger, onlyHistoryTable bool) {
 			zillowLogger.Info("Not found maindb3 data")
 			return
 		}
-		go func(maindb3DataList []*entity.Maindb3, wg *sync.WaitGroup) {
+		go func(maindb3DataList []*entity.ZillowMaindb3Address, wg *sync.WaitGroup) {
 			defer wg.Done()
 			for {
 				zillowCrawler, err := zillow.NewZillowCrawler(c, maindb3DataList, zillowService, maindb3Service, zillowLogger, onlyHistoryTable)

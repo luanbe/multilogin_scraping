@@ -6,9 +6,9 @@ import (
 )
 
 type ZillowService interface {
-	AddZillow(zillowData *entity.ZillowData) error
-	UpdateZillow(zillowData *entity.ZillowData, id uint64) error
-	GetZillow(id uint64) (*entity.ZillowData, error)
+	AddZillow(zillowData *entity.ZillowDetail) error
+	UpdateZillow(zillowData *entity.ZillowDetail, id uint64) error
+	GetZillow(id uint64) (*entity.ZillowDetail, error)
 	UpdateZillowPriceHistory(zillowPriceHistories []*entity.ZillowPriceHistory) error
 	UpdateZillowPublicTaxHistory(zillowPublicTaxHistories []*entity.ZillowPublicTaxHistory) error
 }
@@ -27,21 +27,21 @@ func NewZillowService(
 	return &ZillowServiceImpl{baseRepo, zillowRepo}
 }
 
-func (s *ZillowServiceImpl) AddZillow(zillowData *entity.ZillowData) error {
+func (s *ZillowServiceImpl) AddZillow(zillowData *entity.ZillowDetail) error {
 	if err := s.zillowRepo.AddZillow(zillowData); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *ZillowServiceImpl) UpdateZillow(zillowData *entity.ZillowData, id uint64) error {
+func (s *ZillowServiceImpl) UpdateZillow(zillowData *entity.ZillowDetail, id uint64) error {
 	if err := s.zillowRepo.UpdateZillow(zillowData, map[string]interface{}{"id": id}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *ZillowServiceImpl) GetZillow(id uint64) (*entity.ZillowData, error) {
+func (s *ZillowServiceImpl) GetZillow(id uint64) (*entity.ZillowDetail, error) {
 	zillowData, err := s.zillowRepo.GetZillowFirst(map[string]interface{}{"maindb3_id": id})
 	if err != nil && err.Error() != "record not found" {
 		return nil, err
