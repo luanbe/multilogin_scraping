@@ -67,7 +67,18 @@ func InitLogger(InitFields map[string]interface{}, LogFile string) *zap.Logger {
 	if InitFields != nil {
 		cfg.InitialFields = InitFields
 	}
+	switch viper.GetString("crawler.log_level") {
+	case "error":
+		cfg.Level.SetLevel(zap.ErrorLevel)
+	case "info":
+		cfg.Level.SetLevel(zap.InfoLevel)
+	case "debug":
+		cfg.Level.SetLevel(zap.DebugLevel)
+	default:
+		cfg.Level.SetLevel(zap.InfoLevel)
+	}
 
+	// viper.GetString("crawler.log_level")
 	cfg.OutputPaths = []string{"stdout"}
 	cfg.ErrorOutputPaths = []string{"stdout", "stderr"}
 	if LogFile != "" {

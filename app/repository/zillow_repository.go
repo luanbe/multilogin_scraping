@@ -20,7 +20,7 @@ func NewZillowRepository(br BaseRepository) ZillowRepository {
 	return &ZillowRepositoryImpl{br}
 }
 
-// func (r *ZillowRepositoryImpl) GetZillow(Zillow *entity.ZillowDatam, id uint64) error {
+// func (r *ZillowRepositoryImpl) GetZillowByID(Zillow *entity.ZillowDatam, id uint64) error {
 
 // }
 
