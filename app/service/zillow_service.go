@@ -8,7 +8,8 @@ import (
 type ZillowService interface {
 	AddZillow(zillowData *entity.ZillowDetail) error
 	UpdateZillow(zillowData *entity.ZillowDetail, id uint64) error
-	GetZillow(id uint64) (*entity.ZillowDetail, error)
+	GetZillowByID(id uint64) (*entity.ZillowDetail, error)
+	GetZillowByURL(url string) (*entity.ZillowDetail, error)
 	UpdateZillowPriceHistory(zillowPriceHistories []*entity.ZillowPriceHistory) error
 	UpdateZillowPublicTaxHistory(zillowPublicTaxHistories []*entity.ZillowPublicTaxHistory) error
 }
@@ -41,8 +42,17 @@ func (s *ZillowServiceImpl) UpdateZillow(zillowData *entity.ZillowDetail, id uin
 	return nil
 }
 
-func (s *ZillowServiceImpl) GetZillow(id uint64) (*entity.ZillowDetail, error) {
+func (s *ZillowServiceImpl) GetZillowByID(id uint64) (*entity.ZillowDetail, error) {
 	zillowData, err := s.zillowRepo.GetZillowFirst(map[string]interface{}{"maindb3_id": id})
+	if err != nil && err.Error() != "record not found" {
+		return nil, err
+	}
+
+	return zillowData, nil
+}
+
+func (s *ZillowServiceImpl) GetZillowByURL(url string) (*entity.ZillowDetail, error) {
+	zillowData, err := s.zillowRepo.GetZillowFirst(map[string]interface{}{"url": url})
 	if err != nil && err.Error() != "record not found" {
 		return nil, err
 	}

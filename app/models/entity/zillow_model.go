@@ -14,10 +14,10 @@ type ZillowDetail struct {
 	URL                        string    `gorm:"type:text" json:"url"`
 	Address                    string    `gorm:"type:text" json:"address"`
 	PropertyStatus             bool      `json:"property_status"`
-	Bed                        int       `json:"bed"`
-	Bath                       int       `gorm:"type:decimal" json:"bath"`
-	FullBathrooms              int       `gorm:"type:decimal" json:"full_bathrooms"`
-	HalfBathrooms              int       `gorm:"type:decimal" json:"half_bathrooms"`
+	Bed                        float64   `json:"bed"`
+	Bath                       float64   `gorm:"type:decimal" json:"bath"`
+	FullBathrooms              float64   `gorm:"type:decimal" json:"full_bathrooms"`
+	HalfBathrooms              float64   `gorm:"type:decimal" json:"half_bathrooms"`
 	SF                         float64   `gorm:"type:decimal" json:"sf"`
 	SalesPrice                 float64   `gorm:"type:decimal" json:"sales_price"`
 	EstPayment                 string    `gorm:"type:varchar(250)" json:"est_payment"`
@@ -92,6 +92,7 @@ type ZillowDetail struct {
 	DataSource                 string    `gorm:"type:varchar(250)" json:"data_source"`
 	CountyTaxAssessorURL       string    `gorm:"type:text" json:"county_tax_assessor_url"`
 	TimestampForDataExtraction time.Time `gorm:"type:timestamp" json:"timestamp_for_data_extraction"`
+	CrawlingStatus             string    `gorm:"type:varchar(50)" json:"crawling_status"`
 }
 
 type ZillowPriceHistory struct {
