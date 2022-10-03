@@ -37,7 +37,7 @@ var profileURL string = "/api/v2/profile/"
 func (ps *Profile) CreateProfile() error {
 	oses := []string{"win", "mac", "android", "lin"}
 	//browsers := []string{"stealthfox", "mimic"}
-	browsers := []string{"mimic"}
+	browsers := []string{"stealthfox"}
 	values := &map[string]string{
 		"name":    fmt.Sprint(ps.Name, "-Crawler-", util2.RandInt()),
 		"os":      util2.RandSliceStr(oses),
@@ -106,6 +106,7 @@ func (bs *BaseSelenium) StartSelenium(profileName string) error {
 	time.Sleep(3 * time.Second)
 	selenium.SetDebug(viper.GetBool("crawler.selenium_debug"))
 	caps := selenium.Capabilities{}
+
 	//caps.AddFirefox(firefox.Capabilities{Args: []string{"--headless", "--no-sandbox"}})
 	// Connect to Selenium
 	wd, err := selenium.NewRemote(caps, ps.Value)

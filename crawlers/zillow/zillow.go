@@ -23,18 +23,19 @@ import (
 )
 
 type ZillowCrawler struct {
-	WebDriver        selenium.WebDriver
-	BaseSel          *crawlers.BaseSelenium
-	Profile          *crawlers.Profile
-	CZillow          *colly.Collector
-	SearchPageReq    *SearchPageReq
-	CrawlerTables    *CrawlerTables
-	CrawlerServices  CrawlerServices
-	Logger           *zap.Logger
-	OnlyHistoryTable bool
-	CrawlerBlocked   bool
-	BrowserTurnOff   bool
-	Maindb3List      []*entity.ZillowMaindb3Address
+	WebDriver               selenium.WebDriver
+	BaseSel                 *crawlers.BaseSelenium
+	Profile                 *crawlers.Profile
+	CZillow                 *colly.Collector
+	SearchPageReq           *SearchPageReq
+	CrawlerTables           *CrawlerTables
+	CrawlerServices         CrawlerServices
+	Logger                  *zap.Logger
+	OnlyHistoryTable        bool
+	CrawlerBlocked          bool
+	BrowserTurnOff          bool
+	Maindb3List             []*entity.ZillowMaindb3Address
+	SearchDataByCollyStatus bool
 }
 
 type CrawlerTables struct {
@@ -100,10 +101,10 @@ func NewZillowCrawler(
 func (zc *ZillowCrawler) GetURLCrawling() string {
 	address := fmt.Sprint(strings.TrimSpace(zc.CrawlerTables.Maindb3.OwnerAddress), ", ", zc.CrawlerTables.Maindb3.OwnerCityState)
 	address = strings.Replace(address, " ", "-", -1)
-	//return fmt.Sprint("https://www.zillow.com/homes/", address, "_rb/")
+	return fmt.Sprint("https://www.zillow.com/homes/", address, "_rb/")
 
 	//// NOTE: For testing data
-	return "https://www.zillow.com/homes/4432-ASPEN-WAY,-HALTOM-CITY,-TX_rb/"
+	//return "https://www.zillow.com/homes/PO-BOX-2073,-LAKE-DALLAS,-TX_rb/"
 }
 
 func (zc *ZillowCrawler) ShowLogError(mes string) {
@@ -145,8 +146,8 @@ func (zc *ZillowCrawler) RunZillowCrawler() error {
 	}
 }
 
-func (zc *ZillowCrawler) CheckVerifyHuman(pageSource string, url string) error {
-	if strings.Contains(pageSource, "Please verify you're a human to continue") || strings.Contains(pageSource, "Let's confirm you are human") {
+func (zc *ZillowCrawler) ByPassVerifyHuman(pageSource string, url string) error {
+	if zc.IsVerifyHuman(pageSource) == true {
 		zc.CrawlerBlocked = true
 
 	}
@@ -157,7 +158,7 @@ func (zc *ZillowCrawler) CheckVerifyHuman(pageSource string, url string) error {
 				return err
 			}
 			pageSource, _ = zc.WebDriver.PageSource()
-			if strings.Contains(pageSource, "Please verify you're a human to continue") == false || strings.Contains(pageSource, "Let's confirm you are human") == false {
+			if zc.IsVerifyHuman(pageSource) == false {
 				zc.CrawlerBlocked = false
 				return nil
 			}
@@ -166,12 +167,127 @@ func (zc *ZillowCrawler) CheckVerifyHuman(pageSource string, url string) error {
 	}
 	return nil
 }
+func (zc *ZillowCrawler) IsVerifyHuman(pageSource string) bool {
+	if strings.Contains(pageSource, "Please verify you're a human to continue") || strings.Contains(pageSource, "Let's confirm you are human") {
+		return true
+	}
+	return false
+}
 
+func (zc *ZillowCrawler) CrawlSearchDataByColly() {
+	zc.SearchDataByCollyStatus = true
+	cookies, err := zc.BaseSel.GetHttpCookies()
+	if err != nil {
+		zc.ShowLogError(err.Error())
+		zc.SearchDataByCollyStatus = false
+		return
+	}
+
+	if zc.CrawlerTables.MapBounds == nil {
+		zc.ShowLogError("not found map bounds data")
+		zc.SearchDataByCollyStatus = false
+		return
+	}
+
+	zc.CrawlerTables.ZillowSearchData = []*entity.ZillowDetail{}
+
+	temSearch := `
+		{
+		"isMapVisible": true,
+		"filterState": {
+			"sortSelection": {
+				"value": "days"
+			},
+			"isAllHomes": {
+				"value": true
+			}
+		},
+		"isListVisible": true,
+		"mapZoom": 13,
+		"pagination": {
+			"currentPage": 1
+		}
+	}
+	`
+	if err := json.Unmarshal([]byte(temSearch), &zc.SearchPageReq); err != nil {
+		zc.SearchDataByCollyStatus = false
+		zc.ShowLogError(err.Error())
+		return
+	}
+	zc.SearchPageReq.MapBounds = zc.CrawlerTables.MapBounds
+
+	searchPageJson, err := json.Marshal(zc.SearchPageReq)
+	if err != nil {
+		zc.SearchDataByCollyStatus = false
+		zc.ShowLogError(err.Error())
+		return
+	}
+
+	zc.CZillow.OnResponse(func(r *colly.Response) {
+		currentUrl := r.Ctx.Get("currentURL")
+		data := &SearchPageRes{}
+		if err := json.Unmarshal(r.Body, data); err != nil {
+			zc.ShowLogInfo("Not found Json data when crawling by colly")
+			zc.SearchDataByCollyStatus = false
+			return
+		}
+		if len(data.Cat1.SearchResults.RelaxedResults) > 0 {
+			for _, result := range data.Cat1.SearchResults.RelaxedResults {
+				zillowSearchData := zc.CrawlZillowSearchRelaxedData(result)
+				zc.CrawlerTables.ZillowSearchData = append(zc.CrawlerTables.ZillowSearchData, zillowSearchData)
+			}
+			zc.ShowLogInfo(fmt.Sprint("Found relaxedResults for crawling on Current Page: ", currentUrl))
+		}
+
+		if len(data.Cat1.SearchResults.ListResults) > 0 {
+			for _, result := range data.Cat1.SearchResults.ListResults {
+				zillowSearchData := zc.CrawlZillowSearchResultData(result)
+				zc.CrawlerTables.ZillowSearchData = append(zc.CrawlerTables.ZillowSearchData, zillowSearchData)
+			}
+
+			// Crawling data on Next Page
+			zc.SearchPageReq.Pagination.CurrentPage += 1
+			searchNextPageJson, err := json.Marshal(zc.SearchPageReq)
+			if err != nil {
+				zc.SearchDataByCollyStatus = false
+				zc.ShowLogError(err.Error())
+				return
+			}
+			urlNextPage := fmt.Sprintf(searchURL, string(searchNextPageJson))
+			zc.ShowLogInfo(fmt.Sprint("Found listResults for crawling on Current Page: ", currentUrl))
+
+			err = zc.CZillow.SetCookies(urlNextPage, cookies)
+			if err != nil {
+				zc.SearchDataByCollyStatus = false
+				zc.ShowLogError(err.Error())
+				return
+			}
+			if err == nil {
+				r.Request.Visit(urlNextPage)
+			}
+		}
+
+	})
+
+	zc.CZillow.OnError(func(r *colly.Response, err error) {
+		zc.ShowLogError(fmt.Sprint("HTTP Status code:", r.StatusCode, "|URL:", r.Request.URL, "|Errors:", err))
+		zc.SearchDataByCollyStatus = false
+		return
+	})
+	zc.CZillow.OnRequest(func(r *colly.Request) {
+		r.Headers.Set("Content-Type", "application/json")
+		r.Ctx.Put("currentURL", r.URL.String())
+	})
+	urlRun := fmt.Sprintf(searchURL, string(searchPageJson))
+	err = zc.CZillow.SetCookies(urlRun, cookies)
+	if err != nil {
+		zc.SearchDataByCollyStatus = false
+		zc.ShowLogError(err.Error())
+		return
+	}
+	zc.CZillow.Visit(urlRun)
+}
 func (zc *ZillowCrawler) CrawlSearchData() error {
-	//cookies, err := zc.BaseSel.GetHttpCookies()
-	//if err != nil {
-	//	zc.ShowLogError(err.Error())
-	//}
 
 	if zc.CrawlerTables.MapBounds == nil {
 		return fmt.Errorf("not found map bounds data")
@@ -204,79 +320,36 @@ func (zc *ZillowCrawler) CrawlSearchData() error {
 		return err
 	}
 
-	//zc.CZillow.OnResponse(func(r *colly.Response) {
-	//	data := &SearchPageRes{}
-	//	if err := zc.CheckVerifyHuman(string(r.Body)); err != nil {
-	//		zc.ShowLogError(err.Error())
-	//		return
-	//	}
-	//	if err := json.Unmarshal(r.Body, data); err != nil {
-	//		zc.ShowLogError(err.Error())
-	//		return
-	//	}
-	//	if len(data.Cat1.SearchResults.ListResults) > 0 {
-	//		for _, result := range data.Cat1.SearchResults.ListResults {
-	//			newUrls := NewMaindb3URLs{URL: result.DetailURL, AddressStreet: result.AddressStreet, AddressCity: result.AddressCity}
-	//			zc.NewMaindb3URLs = append(zc.NewMaindb3URLs, newUrls)
-	//		}
-	//		// Crawling data on Next Page
-	//		zc.SearchPageReq.Pagination.CurrentPage += 1
-	//		searchNextPageJson, err := json.Marshal(zc.SearchPageReq)
-	//		if err != nil {
-	//			zc.ShowLogError(err.Error())
-	//			return
-	//		}
-	//		urlNextPage := fmt.Sprintf(searchURL, string(searchNextPageJson))
-	//		zc.ShowLogInfo(fmt.Sprint("Found listResults for crawling on Current Page: ", r.Ctx.Get("currentURL")))
-	//		r.Request.Visit(urlNextPage)
-	//
-	//	}
-	//
-	//	if len(data.Cat1.SearchResults.RelaxedResults) > 0 {
-	//		for _, result := range data.Cat1.SearchResults.RelaxedResults {
-	//			newUrls := NewMaindb3URLs{URL: result.DetailURL, AddressStreet: result.AddressStreet, AddressCity: result.AddressCity}
-	//			zc.NewMaindb3URLs = append(zc.NewMaindb3URLs, newUrls)
-	//		}
-	//		zc.ShowLogInfo(fmt.Sprint("Found relaxedResults for crawling on Current Page: ", r.Ctx.Get("currentURL")))
-	//	}
-	//	return
-	//})
-
-	//zc.CZillow.OnError(func(r *colly.Response, err error) {
-	//	zc.ShowLogError(fmt.Sprint("HTTP Status code:", r.StatusCode, "|URL:", r.Request.URL, "|Errors:", err))
-	//	return
-	//})
-	//zc.CZillow.OnRequest(func(r *colly.Request) {
-	//	r.Headers.Set("Content-Type", "application/json")
-	//	r.Ctx.Put("currentURL", r.URL.String())
-	//})
 	urlRun := fmt.Sprintf(searchURL, string(searchPageJson))
-
-	//if cookies != nil {
-	//	err := zc.CZillow.SetCookies(urlRun, cookies)
-	//	if err != nil {
-	//		zc.ShowLogError(err.Error())
-	//	}
-	//}
-	//zc.CZillow.Visit(urlRun)
+	zc.CrawlerTables.ZillowSearchData = []*entity.ZillowDetail{}
 	var nextURL string
+	var firstRun bool
+	firstRun = true
 	for {
-		if nextURL == "" {
+		if nextURL == "" && firstRun == true {
 			url, err := zc.CrawlNextSearchData(urlRun)
 			if err != nil {
 				return err
 			}
+			if url == "" {
+				break
+			}
+			nextURL = url
+			firstRun = false
+			continue
+		}
+		if nextURL != "" {
+			url, err := zc.CrawlNextSearchData(nextURL)
+			if err != nil {
+				return err
+			}
+			if url == "" {
+				break
+			}
 			nextURL = url
 			continue
 		}
-		url, err := zc.CrawlNextSearchData(nextURL)
-		if err != nil {
-			return err
-		}
-		if url == "" {
-			break
-		}
-		nextURL = url
+		break
 	}
 	return nil
 }
@@ -285,19 +358,29 @@ func (zc *ZillowCrawler) CrawlNextSearchData(urlRun string) (string, error) {
 	if err := zc.WebDriver.Get(urlRun); err != nil {
 		return "", err
 	}
-	time.Sleep(time.Second * viper.GetDuration("crawler.zillow_crawler.crawl_next_time"))
+	time.Sleep(time.Second * 3)
+	rawdataTab, err := zc.WebDriver.FindElement(selenium.ByID, "rawdata-tab")
+	if err != nil {
+		return "", err
+	}
+	if err := rawdataTab.Click(); err != nil {
+		return "", err
+	}
+	time.Sleep(time.Second * 2)
 	pageSource, err := zc.WebDriver.PageSource()
 	if err != nil {
 		return "", err
 	}
-	if err := zc.CheckVerifyHuman(pageSource, urlRun); err != nil {
+	if err := zc.ByPassVerifyHuman(pageSource, urlRun); err != nil {
 		return "", err
 	}
 	doc, err := htmlquery.Parse(strings.NewReader(pageSource))
 	if err != nil {
 		return "", err
 	}
-	jsonText := htmlquery.InnerText(doc)
+	el := htmlquery.FindOne(doc, "//pre[@class='data']")
+
+	jsonText := htmlquery.InnerText(el)
 	if err := json.Unmarshal([]byte(jsonText), searchPageRes); err != nil {
 		return "", err
 	}
@@ -389,7 +472,7 @@ func (zc *ZillowCrawler) CrawlAddress(address string) error {
 		zc.BrowserTurnOff = true
 		return err
 	}
-	if err := zc.CheckVerifyHuman(pageSource, address); err != nil {
+	if err := zc.ByPassVerifyHuman(pageSource, address); err != nil {
 		return err
 	}
 	if err := zc.ParseData(pageSource); err != nil {
@@ -413,8 +496,11 @@ func (zc *ZillowCrawler) CrawlAddress(address string) error {
 	if err := zc.UpdateMaindb3DB(); err != nil {
 		return err
 	}
-	if err := zc.CrawlSearchData(); err != nil {
-		return err
+	zc.CrawlSearchDataByColly()
+	if zc.SearchDataByCollyStatus == false {
+		if err := zc.CrawlSearchData(); err != nil {
+			return err
+		}
 	}
 	if len(zc.CrawlerTables.ZillowSearchData) > 0 {
 		for _, v := range zc.CrawlerTables.ZillowSearchData {
@@ -532,9 +618,9 @@ func (zc *ZillowCrawler) ParseData(source string) error {
 		zc.ParseGreatSchools(doc)
 		zc.ParseDistrict(doc)
 		zc.ParseDataSource(doc)
-		zc.CrawlerTables.ZillowData.Maindb3ID = zc.CrawlerTables.Maindb3.ID
-		zc.ParseMapBounds(doc)
+		zc.CrawlerTables.ZillowData.Maindb3ID = &zc.CrawlerTables.Maindb3.ID
 	}
+	zc.ParseMapBounds(doc)
 	zc.ParseZillowPriceHistory(doc)
 	zc.ParseZillowPublicTaxHistory(doc)
 
