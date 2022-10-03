@@ -10,7 +10,8 @@ import (
 // TODO: Use swagger later
 type ZillowDetail struct {
 	base.BaseIDModel
-	Maindb3ID                  uint64    `gorm:"column:maindb3_id; unique" json:"maindb3_id"`
+	// Add pointer to foreign key to set null
+	Maindb3ID                  *uint64   `gorm:"column:maindb3_id; unique" json:"maindb3_id"`
 	URL                        string    `gorm:"type:text" json:"url"`
 	Address                    string    `gorm:"type:text" json:"address"`
 	PropertyStatus             bool      `json:"property_status"`
@@ -53,7 +54,7 @@ type ZillowDetail struct {
 	Appliances                 string    `gorm:"type:varchar(250)" json:"appliances"`
 	LivingRoomLevel            string    `gorm:"type:varchar(250)" json:"living_room_level"`
 	LivingRoomDimensions       string    `gorm:"type:varchar(250)" json:"living_room_dimensions"`
-	InteriorFeatures           string    `gorm:"type:varchar(250)" json:"interior_features"`
+	InteriorFeatures           string    `gorm:"type:text" json:"interior_features"`
 	PrimaryBedroomLevel        string    `gorm:"type:varchar(250)" json:"primary_bedroom_level"`
 	PrimaryBedroomDimensions   string    `gorm:"type:varchar(250)" json:"primary_bedroom_dimensions"`
 	Basement                   string    `gorm:"type:varchar(250)" json:"basement"`

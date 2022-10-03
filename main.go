@@ -59,7 +59,7 @@ func PeriodicTasks(db *gorm.DB) error {
 	s := gocron.NewScheduler(time.UTC)
 	zillowLogger := initialization.InitLogger(
 		map[string]interface{}{"Logger": "Zillow"},
-		"zillow.log",
+		viper.GetString("crawler.zillow_crawler.log_file"),
 	)
 
 	s.SetMaxConcurrentJobs(viper.GetInt("crawler.workers.concurrent"), gocron.RescheduleMode)
@@ -67,10 +67,10 @@ func PeriodicTasks(db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
-	//_, err = s.Every(viper.GetString("crawler.zillow_crawler.periodic_interval")).SingletonMode().Do(tasks.RunCrawler, db, zillowLogger, true)
-	//if err != nil {
-	//	return err
-	//}
+	_, err = s.Every(viper.GetString("crawler.zillow_crawler.periodic_interval")).SingletonMode().Do(tasks.RunCrawler, db, zillowLogger, true)
+	if err != nil {
+		return err
+	}
 	s.StartAsync()
 	return nil
 }
