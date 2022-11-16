@@ -109,8 +109,16 @@ func NewZillowCrawler(
 }
 
 func (zc *ZillowCrawler) GetURLCrawling() string {
-	address := fmt.Sprint(strings.TrimSpace(zc.CrawlerTables.Maindb3.OwnerAddress), ", ", zc.CrawlerTables.Maindb3.OwnerCityState)
+	var address string
+	if zc.CrawlerTables.Maindb3.OwnerAddress != "" && zc.CrawlerTables.Maindb3.OwnerCityState != "" {
+		address = fmt.Sprint(strings.TrimSpace(zc.CrawlerTables.Maindb3.OwnerAddress), ", ", zc.CrawlerTables.Maindb3.OwnerCityState)
+	} else {
+		ownerCityState := fmt.Sprint(zc.CrawlerTables.Maindb3.AddressCity, ", ", zc.CrawlerTables.Maindb3.AddressState)
+		address = fmt.Sprint(strings.TrimSpace(zc.CrawlerTables.Maindb3.AddressStreet), ", ", ownerCityState)
+	}
+
 	address = strings.Replace(address, " ", "-", -1)
+	address = strings.Replace(address, "--", "-", -1)
 	return fmt.Sprint("https://www.zillow.com/homes/", address, "_rb/")
 
 	//// NOTE: For testing data
@@ -137,7 +145,7 @@ func (zc *ZillowCrawler) RunZillowCrawler() error {
 					zc.ShowLogError(err.Error())
 					zc.ShowLogError("Failed to crawl data")
 					if zc.CrawlerBlocked == true {
-						return nil
+						return err
 					}
 					if err = zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerTables.Maindb3, viper.GetString("crawler.crawler_status.failed")); err != nil {
 						return err

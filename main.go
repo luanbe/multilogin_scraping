@@ -53,6 +53,7 @@ func main() {
 		viper.GetString("server.address"),
 		sessionManager.LoadAndSave(router),
 	))
+
 }
 
 func PeriodicTasks(db *gorm.DB) error {
