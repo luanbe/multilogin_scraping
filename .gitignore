@@ -19,3 +19,4 @@ config-*.json
 .vscode
 *.sql
 *.log
+*_proxies.txt
