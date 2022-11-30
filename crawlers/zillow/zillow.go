@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"golang.org/x/net/html"
+	"gorm.io/gorm"
+	"multilogin_scraping/app/registry"
 	"multilogin_scraping/app/service"
 	"multilogin_scraping/crawlers"
 	util2 "multilogin_scraping/pkg/utils"
@@ -56,10 +58,8 @@ type CrawlerServices struct {
 const searchURL = "https://www.zillow.com/search/GetSearchPageState.htm?searchQueryState=%s&wants={\"cat1\":[\"listResults\",\"mapResults\"],\"cat2\":[\"total\"],\"regionResults\":[\"total\"]}&requestId=5"
 
 func NewZillowCrawler(
-	c *colly.Collector,
+	db *gorm.DB,
 	maindb3List []*entity.ZillowMaindb3Address,
-	zillowService service.ZillowService,
-	maindb3Service service.Maindb3Service,
 	logger *zap.Logger,
 	onlyHistoryTable bool,
 	proxy util2.Proxy,
@@ -84,6 +84,7 @@ func NewZillowCrawler(
 	if userAgent == nil {
 		userAgent = fake.UserAgent()
 	}
+	c := colly.NewCollector()
 	c.UserAgent = userAgent.(string)
 
 	return &ZillowCrawler{
@@ -99,7 +100,7 @@ func NewZillowCrawler(
 			[]*entity.ZillowPublicTaxHistory{},
 			&MapBounds{},
 		},
-		CrawlerServices:  CrawlerServices{zillowService, maindb3Service},
+		CrawlerServices:  CrawlerServices{registry.RegisterZillowService(db), registry.RegisterMaindb3Service(db)},
 		Logger:           logger,
 		OnlyHistoryTable: onlyHistoryTable,
 		CrawlerBlocked:   false,
