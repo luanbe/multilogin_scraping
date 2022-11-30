@@ -62,10 +62,20 @@ func NewZillowCrawler(
 	maindb3Service service.Maindb3Service,
 	logger *zap.Logger,
 	onlyHistoryTable bool,
+	proxy util2.Proxy,
 ) (*ZillowCrawler, error) {
 	BaseSel := crawlers.NewBaseSelenium(logger)
-	if err := BaseSel.StartSelenium("zillow"); err != nil {
+	if err := BaseSel.StartSelenium("zillow", proxy, viper.GetBool("crawler.zillow_crawler.proxy_status")); err != nil {
 		return nil, err
+	}
+
+	// Disable image loading
+	if viper.GetBool("crawler.disable_load_images") == true {
+		if BaseSel.Profile.BrowserName == "stealthfox" {
+			if err := BaseSel.FireFoxDisableImageLoading(); err != nil {
+				return nil, err
+			}
+		}
 	}
 	userAgent, err := BaseSel.WebDriver.ExecuteScript("return navigator.userAgent", nil)
 	if err != nil {
@@ -99,8 +109,16 @@ func NewZillowCrawler(
 }
 
 func (zc *ZillowCrawler) GetURLCrawling() string {
-	address := fmt.Sprint(strings.TrimSpace(zc.CrawlerTables.Maindb3.OwnerAddress), ", ", zc.CrawlerTables.Maindb3.OwnerCityState)
+	var address string
+	if zc.CrawlerTables.Maindb3.OwnerAddress != "" && zc.CrawlerTables.Maindb3.OwnerCityState != "" {
+		address = fmt.Sprint(strings.TrimSpace(zc.CrawlerTables.Maindb3.OwnerAddress), ", ", zc.CrawlerTables.Maindb3.OwnerCityState)
+	} else {
+		ownerCityState := fmt.Sprint(zc.CrawlerTables.Maindb3.AddressCity, ", ", zc.CrawlerTables.Maindb3.AddressState)
+		address = fmt.Sprint(strings.TrimSpace(zc.CrawlerTables.Maindb3.AddressStreet), ", ", ownerCityState)
+	}
+
 	address = strings.Replace(address, " ", "-", -1)
+	address = strings.Replace(address, "--", "-", -1)
 	return fmt.Sprint("https://www.zillow.com/homes/", address, "_rb/")
 
 	//// NOTE: For testing data
@@ -127,7 +145,7 @@ func (zc *ZillowCrawler) RunZillowCrawler() error {
 					zc.ShowLogError(err.Error())
 					zc.ShowLogError("Failed to crawl data")
 					if zc.CrawlerBlocked == true {
-						return nil
+						return err
 					}
 					if err = zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerTables.Maindb3, viper.GetString("crawler.crawler_status.failed")); err != nil {
 						return err
@@ -496,27 +514,29 @@ func (zc *ZillowCrawler) CrawlAddress(address string) error {
 	if err := zc.UpdateMaindb3DB(); err != nil {
 		return err
 	}
-	zc.CrawlSearchDataByColly()
-	if zc.SearchDataByCollyStatus == false {
-		if err := zc.CrawlSearchData(); err != nil {
-			return err
-		}
-	}
-	if len(zc.CrawlerTables.ZillowSearchData) > 0 {
-		for _, v := range zc.CrawlerTables.ZillowSearchData {
-			zillowData, err := zc.CrawlerServices.ZillowService.GetZillowByURL(v.URL)
-			if err != nil {
-				return err
-			}
-			if zillowData == nil {
-				v.CrawlingStatus = viper.GetString("crawler.crawler_status.rerun")
-				if err := zc.CrawlerServices.ZillowService.AddZillow(v); err != nil {
-					return err
-				}
-				zc.ShowLogInfo(fmt.Sprint("Added Searching Data to Zillow Detail Table with ID: ", v.ID))
-			}
-		}
-	}
+
+	// Begin to Crawl map data
+	//zc.CrawlSearchDataByColly()
+	//if zc.SearchDataByCollyStatus == false {
+	//	if err := zc.CrawlSearchData(); err != nil {
+	//		return err
+	//	}
+	//}
+	//if len(zc.CrawlerTables.ZillowSearchData) > 0 {
+	//	for _, v := range zc.CrawlerTables.ZillowSearchData {
+	//		zillowData, err := zc.CrawlerServices.ZillowService.GetZillowByURL(v.URL)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		if zillowData == nil {
+	//			v.CrawlingStatus = viper.GetString("crawler.crawler_status.rerun")
+	//			if err := zc.CrawlerServices.ZillowService.AddZillow(v); err != nil {
+	//				return err
+	//			}
+	//			zc.ShowLogInfo(fmt.Sprint("Added Searching Data to Zillow Detail Table with ID: ", v.ID))
+	//		}
+	//	}
+	//}
 	return nil
 }
 

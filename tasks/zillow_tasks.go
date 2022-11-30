@@ -11,6 +11,7 @@ import (
 	"multilogin_scraping/app/models/entity"
 	"multilogin_scraping/app/registry"
 	"multilogin_scraping/crawlers/zillow"
+	util2 "multilogin_scraping/pkg/utils"
 	"sync"
 )
 
@@ -51,6 +52,12 @@ func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger, onlyHistoryTable bool) {
 		noBrowser = viper.GetInt("crawler.zillow_crawler.periodic_browser_interval")
 		recordSize = viper.GetInt("crawler.zillow_crawler.periodic_record_size_interval")
 	}
+	var proxies []util2.Proxy
+	// load proxies file
+	proxies, err := util2.GetProxies(viper.GetString("crawler.zillow_crawler.proxy_path"))
+	if err != nil {
+		zillowLogger.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
+	}
 
 	wg.Add(noBrowser)
 	page := 0
@@ -82,10 +89,12 @@ func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger, onlyHistoryTable bool) {
 			zillowLogger.Info("Not found maindb3 data")
 			return
 		}
-		go func(maindb3DataList []*entity.ZillowMaindb3Address, wg *sync.WaitGroup) {
+
+		go func(maindb3DataList []*entity.ZillowMaindb3Address, wg *sync.WaitGroup, proxy util2.Proxy) {
 			defer wg.Done()
+
 			for {
-				zillowCrawler, err := zillow.NewZillowCrawler(c, maindb3DataList, zillowService, maindb3Service, zillowLogger, onlyHistoryTable)
+				zillowCrawler, err := zillow.NewZillowCrawler(c, maindb3DataList, zillowService, maindb3Service, zillowLogger, onlyHistoryTable, proxy)
 				if err != nil {
 					zillowLogger.Error(err.Error())
 					continue
@@ -105,7 +114,7 @@ func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger, onlyHistoryTable bool) {
 				zillowCrawler.BaseSel.StopSessionBrowser(true)
 				break
 			}
-		}(maindb3DataList, &wg)
+		}(maindb3DataList, &wg, proxies[i])
 	}
 	wg.Wait()
 	return
