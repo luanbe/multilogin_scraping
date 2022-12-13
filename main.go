@@ -44,9 +44,9 @@ func main() {
 	// Int Router
 	router := initialization.InitRouting(db, sessionManager)
 
-	if err := PeriodicTasks(db); err != nil {
-		logger.Fatal(err.Error())
-	}
+	//if err := PeriodicTasks(db); err != nil {
+	//	logger.Fatal(err.Error())
+	//}
 
 	logger.Info(fmt.Sprintf("Server START on port%v", viper.GetString("server.address")))
 	log.Fatal(http.ListenAndServe(

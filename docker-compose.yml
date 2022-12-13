@@ -65,3 +65,17 @@ services:
       - REDIS_ADDR=redis:6379
       - REDIS_DB=0
       - ENABLE_METRICS_EXPORTER=true
+
+  # Create service with RabbitMQ.
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - 5672:5672   # for sender and consumer connections
+      - 15672:15672 # for serve RabbitMQ GUI
+    volumes:
+      - ${HOME}/rabbitmq/data/:/var/lib/rabbitmq
+      - ${HOME}/rabbitmq/log/:/var/log/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=root
+      - RABBITMQ_DEFAULT_PASS=root
+    restart: always
