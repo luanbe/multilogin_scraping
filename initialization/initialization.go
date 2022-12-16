@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/alexedwards/scs/v2"
+	"github.com/go-chi/render"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"log"
+	"multilogin_scraping/app/delivery/api"
 	"net/http"
 	"os"
 	"time"
@@ -138,6 +140,7 @@ func InitRouting(db *gorm.DB, sessionManager *scs.SessionManager) *chi.Mux {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Mount("/", fontEndRouter(db))
+	r.Mount("/api", apiRouter(db))
 	r.Mount("/admin", adminRouter(db, sessionManager))
 
 	return r
@@ -153,6 +156,14 @@ func fontEndRouter(db *gorm.DB) http.Handler {
 
 	user := delivery.NewUserDelivery(userService)
 	r.Mount("/users", user.Routes())
+	return r
+}
+
+func apiRouter(db *gorm.DB) http.Handler {
+	r := chi.NewRouter()
+	crawler := api.CrawlerDelivery{}
+	r.Use(render.SetContentType(render.ContentTypeJSON))
+	r.Mount("/crawler", crawler.Routes())
 	return r
 }
 
