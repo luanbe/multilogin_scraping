@@ -1,6 +1,5 @@
-package main
-
 version: '3'
+
 services:
   app:
     # Configuration for building the docker image for the service
