@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 	"log"
+	"multilogin_scraping/helper"
 	"multilogin_scraping/initialization"
 	"multilogin_scraping/tasks"
 	"net/http"
@@ -41,8 +42,20 @@ func main() {
 	// Int Session Manager
 	sessionManager := initialization.IntSessionManager()
 
+	// Int RabbitMQ
+	rabbitMQ := helper.NewRabbitMQ(viper.GetString("crawler.rabbitmq.url"), logger)
+	defer rabbitMQ.CloseRabbitMQ()
+
+	//Int Redis
+	redis := helper.NewRedisCache(
+		viper.GetString("crawler.redis.address"),
+		"",
+		viper.GetInt("crawler.redis.db"),
+		logger,
+	)
+
 	// Int Router
-	router := initialization.InitRouting(db, sessionManager)
+	router := initialization.InitRouting(db, sessionManager, rabbitMQ, redis)
 
 	//if err := PeriodicTasks(db); err != nil {
 	//	logger.Fatal(err.Error())

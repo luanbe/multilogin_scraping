@@ -126,6 +126,10 @@ func (zc *ZillowCrawler) GetURLCrawling() string {
 	//return "https://www.zillow.com/homes/PO-BOX-2073,-LAKE-DALLAS,-TX_rb/"
 }
 
+func (zc *ZillowCrawler) GetURLCrawlingAPI(address string) string {
+	return fmt.Sprint("https://www.zillow.com/homes/", address)
+}
+
 func (zc *ZillowCrawler) ShowLogError(mes string) {
 	zc.Logger.Error(mes, zap.Uint64("mainDBID", zc.CrawlerTables.Maindb3.ID), zap.String("URL", zc.GetURLCrawling()))
 }
@@ -156,6 +160,31 @@ func (zc *ZillowCrawler) RunZillowCrawler() error {
 				zc.ShowLogInfo("Completed to crawl data")
 				time.Sleep(time.Second * viper.GetDuration("crawler.zillow_crawler.crawl_next_time"))
 			}
+			return nil
+		}()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func (zc *ZillowCrawler) RunZillowCrawlerAPI(address string) error {
+	for {
+		err := func() error {
+			zc.ShowLogInfo("Zillow Data is crawling...")
+			zc.CrawlerTables.ZillowData.URL = zc.GetURLCrawlingAPI(address)
+			if err := zc.CrawlAddressAPI(zc.CrawlerTables.ZillowData.URL); err != nil {
+				zc.ShowLogError(err.Error())
+				zc.ShowLogError("Failed to crawl data")
+				if zc.CrawlerBlocked == true {
+					return err
+				}
+				if err = zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerTables.Maindb3, viper.GetString("crawler.crawler_status.failed")); err != nil {
+					return err
+				}
+			}
+			zc.ShowLogInfo("Completed to crawl data")
 			return nil
 		}()
 		if err != nil {
@@ -538,6 +567,26 @@ func (zc *ZillowCrawler) CrawlAddress(address string) error {
 	//		}
 	//	}
 	//}
+	return nil
+}
+
+func (zc *ZillowCrawler) CrawlAddressAPI(address string) error {
+	if err := zc.WebDriver.Get(address); err != nil {
+		return err
+	}
+	// NOTE: time to load source. Need to increase if data was not showing
+	time.Sleep(viper.GetDuration("crawler.zillow_crawler.time_load_source") * time.Second)
+	pageSource, err := zc.WebDriver.PageSource()
+	if err != nil {
+		zc.BrowserTurnOff = true
+		return err
+	}
+	if err := zc.ByPassVerifyHuman(pageSource, address); err != nil {
+		return err
+	}
+	if err := zc.ParseData(pageSource); err != nil {
+		return err
+	}
 	return nil
 }
 

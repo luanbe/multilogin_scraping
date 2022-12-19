@@ -9,9 +9,12 @@ import (
 	"gorm.io/gorm"
 	"multilogin_scraping/app/models/entity"
 	"multilogin_scraping/app/registry"
+	"multilogin_scraping/app/schemas"
 	"multilogin_scraping/crawlers/zillow"
+	"multilogin_scraping/helper"
 	util2 "multilogin_scraping/pkg/utils"
 	"sync"
+	"time"
 )
 
 const (
@@ -128,6 +131,61 @@ func (Zillow ZillowProcessor) RunCrawler(
 				continue
 			}
 			break
+		}
+		zillowCrawler.BaseSel.StopSessionBrowser(true)
+		break
+	}
+}
+
+func (Zillow ZillowProcessor) CrawlZillowDataByAPI(address string, crawlerTask *schemas.CrawlerTask, redis helper.RedisCache) {
+	var proxies []util2.Proxy
+	// load proxies file
+	proxies, err := util2.GetProxies(viper.GetString("crawler.zillow_crawler.proxy_path"))
+	if err != nil {
+		Zillow.Logger.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
+	}
+
+	go Zillow.RunCrawlerAPI(address, proxies[util2.RandIntRange(0, len(proxies))], crawlerTask, redis)
+}
+
+func (Zillow ZillowProcessor) RunCrawlerAPI(
+	address string,
+	proxy util2.Proxy,
+	crawlerTask *schemas.CrawlerTask,
+	redis helper.RedisCache,
+) {
+	// Delare a empty slice but we will not use it
+	var maindb3DataList []*entity.ZillowMaindb3Address
+
+	for {
+		zillowCrawler, err := zillow.NewZillowCrawler(
+			Zillow.DB,
+			maindb3DataList,
+			Zillow.Logger,
+			false,
+			proxy,
+		)
+		if err != nil {
+			Zillow.Logger.Error(err.Error())
+			continue
+		}
+		Zillow.Logger.Info(fmt.Sprint("Start crawler on Multilogin App: ", zillowCrawler.BaseSel.Profile.UUID))
+		if err := zillowCrawler.RunZillowCrawlerAPI(address); err != nil {
+			zillowCrawler.ShowLogError(err.Error())
+			zillowCrawler.BaseSel.StopSessionBrowser(true)
+			if zillowCrawler.CrawlerBlocked == true {
+				continue
+			}
+			if zillowCrawler.BrowserTurnOff == true {
+				continue
+			}
+			crawlerTask.Error = err.Error()
+			crawlerTask.Status = viper.GetString("crawler.crawler_status.failed")
+			redis.SetRedis(crawlerTask.TaskID, crawlerTask, time.Hour*1)
+		} else {
+			crawlerTask.Status = viper.GetString("crawler.crawler_status.succeeded")
+			crawlerTask.ZillowDetail = zillowCrawler.CrawlerTables.ZillowData
+			redis.SetRedis(crawlerTask.TaskID, crawlerTask, time.Hour*1)
 		}
 		zillowCrawler.BaseSel.StopSessionBrowser(true)
 		break

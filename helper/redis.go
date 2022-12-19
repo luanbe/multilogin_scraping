@@ -2,51 +2,61 @@ package helper
 
 import (
 	"context"
-	"github.com/go-redis/cache/v8"
+	"encoding/json"
 	"github.com/go-redis/redis/v8"
+	"go.uber.org/zap"
 	"time"
 )
 
 type RedisCache interface {
-	AddRedisCache(key string, obj *struct{}, ttl time.Duration)
-	GetRedisCache(key string, obj *struct{})
+	SetRedis(key string, value interface{}, ttl time.Duration) error
+	GetRedis(key string, dest interface{}) error
 }
 
 type RedisHelper struct {
-	Addresses map[string]string
-	Ring      *redis.Ring
-	MyCache   *cache.Cache
-	Ctx       context.Context
+	Client   *redis.Client
+	Address  string
+	Password string
+	DB       int
+	Context  context.Context
+	Utils    *UtilHelper
 }
 
-func NewRedisCache(address map[string]string) RedisCache {
-	r := &RedisHelper{Addresses: address}
+func NewRedisCache(address, password string, db int, logger *zap.Logger) RedisCache {
+	utils := &UtilHelper{}
+	r := &RedisHelper{Address: address, Password: password, DB: db, Utils: utils}
 	r.CreateRedisConnection()
 	return r
 }
 
 func (r *RedisHelper) CreateRedisConnection() {
-	r.Ring = redis.NewRing(&redis.RingOptions{
-		Addrs: r.Addresses,
+	r.Context = context.Background()
+	r.Client = redis.NewClient(&redis.Options{
+		Addr:     r.Address,
+		Password: r.Password, // no password set
+		DB:       r.DB,       // use default DB
 	})
-	r.MyCache = cache.New(&cache.Options{
-		Redis:      r.Ring,
-		LocalCache: cache.NewTinyLFU(1000, time.Minute),
-	})
-	r.Ctx = context.TODO()
 }
 
-func (r *RedisHelper) AddRedisCache(key string, obj *struct{}, ttl time.Duration) {
-	err := r.MyCache.Set(&cache.Item{
-		Ctx:   r.Ctx,
-		Key:   key,
-		Value: obj,
-		TTL:   ttl,
-	})
-	failOnError(err, "Failed on add Redis Cache")
+func (r *RedisHelper) SetRedis(key string, value interface{}, ttl time.Duration) error {
+	valueByte, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	if err = r.Client.Set(r.Context, key, valueByte, ttl).Err(); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (r *RedisHelper) GetRedisCache(key string, obj *struct{}) {
-	err := r.MyCache.Get(r.Ctx, key, obj)
-	failOnError(err, "Failed on get Redis Cache")
+func (r *RedisHelper) GetRedis(key string, dest interface{}) error {
+	valueByte, err := r.Client.Get(r.Context, key).Bytes()
+	if err != nil {
+		return err
+	}
+
+	if err = json.Unmarshal(valueByte, dest); err != nil {
+		return err
+	}
+	return nil
 }

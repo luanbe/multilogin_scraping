@@ -6,10 +6,15 @@ require (
 	github.com/alexedwards/scs/v2 v2.5.0
 	github.com/antchfx/htmlquery v1.2.5
 	github.com/go-chi/chi/v5 v5.0.7
+	github.com/go-chi/render v1.0.2
 	github.com/go-co-op/gocron v1.18.0
+	github.com/go-redis/cache/v8 v8.4.4
+	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gocolly/colly v1.2.0
+	github.com/gofrs/uuid v4.0.0+incompatible
 	github.com/hibiken/asynq v0.23.0
 	github.com/icrowley/fake v0.0.0-20221112152111-d7b7e2276db2
+	github.com/rabbitmq/amqp091-go v1.5.0
 	github.com/spf13/viper v1.14.0
 	github.com/tebeka/selenium v0.9.9
 	go.uber.org/zap v1.24.0
@@ -32,17 +37,12 @@ require (
 	github.com/corpix/uarand v0.2.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/go-chi/render v1.0.2 // indirect
-	github.com/go-redis/cache/v8 v8.4.4 // indirect
-	github.com/go-redis/redis/v8 v8.11.5 // indirect
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
-	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/hibiken/asynqmon v0.7.1 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.13.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
@@ -60,7 +60,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
-	github.com/rabbitmq/amqp091-go v1.5.0 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rogpeppe/go-internal v1.6.2 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
@@ -68,7 +67,6 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/streadway/amqp v1.0.0 // indirect
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	github.com/vmihailenco/go-tinylfu v0.2.2 // indirect
@@ -84,7 +82,6 @@ require (
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

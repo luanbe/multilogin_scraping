@@ -3,43 +3,48 @@ package helper
 import (
 	"context"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"log"
+	"go.uber.org/zap"
 	"time"
 )
 
 type RabbitMQBroker interface {
-	PublishMessage(exchangeType, exchangeName, routingKey, body string)
-	ConsumeMessage(exchangeType, exchangeName, queueName, routingKey string)
+	PublishMessage(exchangeType, exchangeName, routingKey string, body []byte) error
+	ConsumeMessage(exchangeType, exchangeName, queueName, routingKey string) (<-chan amqp.Delivery, *RabbitMQHelper)
+	CloseRabbitMQ()
 }
 type RabbitMQHelper struct {
 	ServerURL string
 	Connect   *amqp.Connection
 	Channel   *amqp.Channel
+	Logger    *zap.Logger
+	Utils     *UtilHelper
 }
 
-func NewRabbitMQ(serverURL string) RabbitMQBroker {
-	r := &RabbitMQHelper{ServerURL: serverURL}
+func NewRabbitMQ(serverURL string, rabbitLog *zap.Logger) RabbitMQBroker {
+	utils := &UtilHelper{}
+	r := &RabbitMQHelper{ServerURL: serverURL, Logger: rabbitLog, Utils: utils}
 	r.CreateRabbitMQ()
 	return r
 }
 
 func (r *RabbitMQHelper) CreateRabbitMQ() {
 	conn, err := amqp.Dial(r.ServerURL)
-	failOnError(err, "Failed to connect to RabbitMQHelper")
+	r.Utils.failOnError(err, "Failed to connect to RabbitMQHelper")
 
 	ch, err := conn.Channel()
-	failOnError(err, "Failed to open a channel")
+	r.Utils.failOnError(err, "Failed to open a channel")
 
 	r.Connect = conn
 	r.Channel = ch
 
 }
 
-func (r *RabbitMQHelper) PublishMessage(exchangeType, exchangeName, routingKey, body string) {
-	defer r.Connect.Close()
-	defer r.Channel.Close()
-
-	err := r.Channel.ExchangeDeclare(
+func (r *RabbitMQHelper) CloseRabbitMQ() {
+	r.Connect.Close()
+	r.Channel.Close()
+}
+func (r *RabbitMQHelper) PublishMessage(exchangeType, exchangeName, routingKey string, body []byte) error {
+	if err := r.Channel.ExchangeDeclare(
 		exchangeName, // name
 		exchangeType, // type
 		true,         // durable
@@ -47,27 +52,27 @@ func (r *RabbitMQHelper) PublishMessage(exchangeType, exchangeName, routingKey, 
 		false,        // internal
 		false,        // no-wait
 		nil,          // arguments
-	)
-	failOnError(err, "Failed to declare an exchange")
+	); err != nil {
+		return err
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err = r.Channel.PublishWithContext(ctx,
+	if err := r.Channel.PublishWithContext(ctx,
 		exchangeName, // exchange
 		routingKey,   // routing key
 		false,        // mandatory
 		false,        // immediate
 		amqp.Publishing{
 			ContentType: "text/plain",
-			Body:        []byte(body),
-		})
-	failOnError(err, "Failed to publish a message")
-
+			Body:        body,
+		}); err != nil {
+		return err
+	}
+	return nil
 }
-func (r *RabbitMQHelper) ConsumeMessage(exchangeType, exchangeName, queueName, routingKey string) {
-	defer r.Connect.Close()
-	defer r.Channel.Close()
+func (r *RabbitMQHelper) ConsumeMessage(exchangeType, exchangeName, queueName, routingKey string) (<-chan amqp.Delivery, *RabbitMQHelper) {
 	err := r.Channel.ExchangeDeclare(
 		exchangeName, // name
 		exchangeType, // type
@@ -77,7 +82,7 @@ func (r *RabbitMQHelper) ConsumeMessage(exchangeType, exchangeName, queueName, r
 		false,        // no-wait
 		nil,          // arguments
 	)
-	failOnError(err, "Failed to declare an exchange")
+	r.Utils.failOnError(err, "Failed to declare an exchange")
 
 	q, err := r.Channel.QueueDeclare(
 		queueName, // name
@@ -87,7 +92,7 @@ func (r *RabbitMQHelper) ConsumeMessage(exchangeType, exchangeName, queueName, r
 		false,     // no-wait
 		nil,       // arguments
 	)
-	failOnError(err, "Failed to declare a queue")
+	r.Utils.failOnError(err, "Failed to declare a queue")
 
 	err = r.Channel.QueueBind(
 		q.Name,       // queue name
@@ -95,7 +100,7 @@ func (r *RabbitMQHelper) ConsumeMessage(exchangeType, exchangeName, queueName, r
 		exchangeName, // exchange
 		false,
 		nil)
-	failOnError(err, "Failed to bind a queue")
+	r.Utils.failOnError(err, "Failed to bind a queue")
 
 	messages, err := r.Channel.Consume(
 		q.Name, // queue
@@ -106,22 +111,11 @@ func (r *RabbitMQHelper) ConsumeMessage(exchangeType, exchangeName, queueName, r
 		false,  // no wait
 		nil,    // args
 	)
-	failOnError(err, "Failed to register a consumer")
+	r.Utils.failOnError(err, "Failed to register a consumer")
 
 	// Build a welcome message.
-	log.Println("Successfully connected to RabbitMQHelper")
-	log.Println("Waiting for messages")
+	r.Logger.Info("Successfully connected to RabbitMQHelper")
+	r.Logger.Info("Waiting for messages")
 
-	// Make a channel to receive messages into infinite loop.
-	forever := make(chan bool)
-
-	go func() {
-		for message := range messages {
-			// For example, show received message in a console.
-			log.Printf(" > Received message: %s\n", message.Body)
-		}
-	}()
-
-	<-forever
-
+	return messages, r
 }

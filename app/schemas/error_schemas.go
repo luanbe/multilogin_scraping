@@ -46,3 +46,12 @@ func ErrNotFound(err error) render.Renderer {
 		ErrorText:      err.Error(),
 	}
 }
+
+func ErrServer(err error) render.Renderer {
+	return &ErrResponse{
+		Err:            err,
+		HTTPStatusCode: 404,
+		StatusText:     "Error on server",
+		ErrorText:      err.Error(),
+	}
+}
