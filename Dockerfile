@@ -5,8 +5,9 @@ FROM golang:1.19-alpine
 
 # The latest alpine images don't have some tools like (`git` and `bash`).
 # Adding git, bash and openssh to the image
-RUN apk update && apk upgrade && \
-    apk add --no-cache bash git openssh
+RUN apk update &&  \
+    apk upgrade && \
+    apk add --no-cache bash git openssh gcc g++
 
 # Add Maintainer Info
 LABEL maintainer="Luan Nguyen <luanbe68@gmail.com>"
