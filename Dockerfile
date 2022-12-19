@@ -1,4 +1,4 @@
- Dockerfile References: https://docs.docker.com/engine/reference/builder/
+#Dockerfile References: https://docs.docker.com/engine/reference/builder/
 
 # Start from golang:1.19-alpine base image
 FROM golang:1.19-alpine
