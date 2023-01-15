@@ -43,12 +43,12 @@ func NewBaseSelenium(logger *zap.Logger) *BaseSelenium {
 	return &BaseSelenium{Logger: logger}
 }
 
-var mla_url string = "/api/v1/profile/start?automation=true&profileId="
+var mlaUrl string = "/api/v1/profile/start?automation=true&profileId="
 var profileURL string = "/api/v2/profile/"
 
 func (ps *Profile) CreateProfile() error {
 	// Create random profile multilogin app
-	oses := []string{"win", "mac", "android", "lin"}
+	oses := []string{"win", "mac", "lin"}
 	//browsers := []string{"stealthfox", "mimic"}
 	browsers := []string{"stealthfox"}
 	//values := &map[string]string{
@@ -92,7 +92,7 @@ func (ps *Profile) CreateProfile() error {
 
 // FetchProfile to get URL for remoting
 func (ps *Profile) FetchProfile() error {
-	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), mla_url, ps.UUID)
+	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), mlaUrl, ps.UUID)
 	resp, err := http.Get(url)
 	if err != nil {
 		return err

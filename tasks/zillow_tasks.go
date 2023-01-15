@@ -137,21 +137,21 @@ func (Zillow ZillowProcessor) RunCrawler(
 	}
 }
 
-func (Zillow ZillowProcessor) CrawlZillowDataByAPI(address string, crawlerTask *schemas.CrawlerTask, redis helper.RedisCache) {
+func (zp ZillowProcessor) CrawlZillowDataByAPI(address string, crawlerTask *schemas.ZillowCrawlerTask, redis helper.RedisCache) {
 	var proxies []util2.Proxy
 	// load proxies file
 	proxies, err := util2.GetProxies(viper.GetString("crawler.zillow_crawler.proxy_path"))
 	if err != nil {
-		Zillow.Logger.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
+		zp.Logger.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
 	}
 
-	go Zillow.RunCrawlerAPI(address, proxies[util2.RandIntRange(0, len(proxies))], crawlerTask, redis)
+	go zp.RunZillowCrawlerAPI(address, proxies[util2.RandIntRange(0, len(proxies))], crawlerTask, redis)
 }
 
-func (Zillow ZillowProcessor) RunCrawlerAPI(
+func (zp ZillowProcessor) RunZillowCrawlerAPI(
 	address string,
 	proxy util2.Proxy,
-	crawlerTask *schemas.CrawlerTask,
+	crawlerTask *schemas.ZillowCrawlerTask,
 	redis helper.RedisCache,
 ) {
 	// Delare a empty slice but we will not use it
@@ -159,17 +159,17 @@ func (Zillow ZillowProcessor) RunCrawlerAPI(
 
 	for {
 		zillowCrawler, err := zillow.NewZillowCrawler(
-			Zillow.DB,
+			zp.DB,
 			maindb3DataList,
-			Zillow.Logger,
+			zp.Logger,
 			false,
 			proxy,
 		)
 		if err != nil {
-			Zillow.Logger.Error(err.Error())
+			zp.Logger.Error(err.Error())
 			continue
 		}
-		Zillow.Logger.Info(fmt.Sprint("Start crawler on Multilogin App: ", zillowCrawler.BaseSel.Profile.UUID))
+		zp.Logger.Info(fmt.Sprint("Start crawler on Multilogin App: ", zillowCrawler.BaseSel.Profile.UUID))
 		if err := zillowCrawler.RunZillowCrawlerAPI(address); err != nil {
 			zillowCrawler.ShowLogError(err.Error())
 			zillowCrawler.BaseSel.StopSessionBrowser(true)

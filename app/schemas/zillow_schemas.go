@@ -1,4 +1,9 @@
-package zillow
+package schemas
+
+import (
+	"multilogin_scraping/app/models/entity"
+	"net/http"
+)
 
 type MapBounds struct {
 	West  float64 `json:"west"`
@@ -378,4 +383,17 @@ type ZillowData struct {
 	DataSource                 string
 	CountyTaxAssessorURL       string
 	TimestampForDataExtraction string
+}
+
+type ZillowCrawlerTask struct {
+	Status        string               `json:"status"`
+	TaskID        string               `json:"task_id"`
+	Address       string               `json:"address"`
+	Error         string               `json:"error"`
+	RealtorDetail *entity.ZillowDetail `json:"zillow_detail"`
+}
+
+func (cr *ZillowCrawlerTask) Render(w http.ResponseWriter, r *http.Request) error {
+	// Pre-processing before a response is marshalled and sent across the wire
+	return nil
 }

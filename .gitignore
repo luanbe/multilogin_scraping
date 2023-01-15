@@ -22,3 +22,4 @@ config-*.json
 *_proxies.txt
 
 bin
+proxies.txt

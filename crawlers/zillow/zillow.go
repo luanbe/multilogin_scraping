@@ -7,6 +7,7 @@ import (
 	"golang.org/x/net/html"
 	"gorm.io/gorm"
 	"multilogin_scraping/app/registry"
+	"multilogin_scraping/app/schemas"
 	"multilogin_scraping/app/service"
 	"multilogin_scraping/crawlers"
 	util2 "multilogin_scraping/pkg/utils"
@@ -29,7 +30,7 @@ type ZillowCrawler struct {
 	BaseSel                 *crawlers.BaseSelenium
 	Profile                 *crawlers.Profile
 	CZillow                 *colly.Collector
-	SearchPageReq           *SearchPageReq
+	SearchPageReq           *schemas.SearchPageReq
 	CrawlerTables           *CrawlerTables
 	CrawlerServices         CrawlerServices
 	Logger                  *zap.Logger
@@ -46,7 +47,7 @@ type CrawlerTables struct {
 	ZillowSearchData       []*entity.ZillowDetail
 	ZillowPriceHistory     []*entity.ZillowPriceHistory
 	ZillowPublicTaxHistory []*entity.ZillowPublicTaxHistory
-	MapBounds              *MapBounds
+	MapBounds              *schemas.MapBounds
 	//ZillowDetail *entry.ZillowDetail
 }
 
@@ -98,7 +99,7 @@ func NewZillowCrawler(
 			[]*entity.ZillowDetail{},
 			[]*entity.ZillowPriceHistory{},
 			[]*entity.ZillowPublicTaxHistory{},
-			&MapBounds{},
+			&schemas.MapBounds{},
 		},
 		CrawlerServices:  CrawlerServices{registry.RegisterZillowService(db), registry.RegisterMaindb3Service(db)},
 		Logger:           logger,
@@ -120,14 +121,10 @@ func (zc *ZillowCrawler) GetURLCrawling() string {
 
 	address = strings.Replace(address, " ", "-", -1)
 	address = strings.Replace(address, "--", "-", -1)
-	return fmt.Sprint("https://www.zillow.com/homes/", address, "_rb/")
+	return fmt.Sprint(viper.GetString("crawler.zillow_crawler.url"), address, "_rb/")
 
 	//// NOTE: For testing data
 	//return "https://www.zillow.com/homes/PO-BOX-2073,-LAKE-DALLAS,-TX_rb/"
-}
-
-func (zc *ZillowCrawler) GetURLCrawlingAPI(address string) string {
-	return fmt.Sprint("https://www.zillow.com/homes/", address)
 }
 
 func (zc *ZillowCrawler) ShowLogError(mes string) {
@@ -173,16 +170,17 @@ func (zc *ZillowCrawler) RunZillowCrawlerAPI(address string) error {
 	for {
 		err := func() error {
 			zc.ShowLogInfo("Zillow Data is crawling...")
-			zc.CrawlerTables.ZillowData.URL = zc.GetURLCrawlingAPI(address)
+			zc.CrawlerTables.ZillowData.URL = viper.GetString("crawler.zillow_crawler.url")
 			if err := zc.CrawlAddressAPI(zc.CrawlerTables.ZillowData.URL); err != nil {
 				zc.ShowLogError(err.Error())
 				zc.ShowLogError("Failed to crawl data")
 				if zc.CrawlerBlocked == true {
 					return err
 				}
-				if err = zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerTables.Maindb3, viper.GetString("crawler.crawler_status.failed")); err != nil {
-					return err
-				}
+				// TODO: Update error for crawling data here
+				//if err = zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerTables.Maindb3, viper.GetString("crawler.crawler_status.failed")); err != nil {
+				//	return err
+				//}
 			}
 			zc.ShowLogInfo("Completed to crawl data")
 			return nil
@@ -273,7 +271,7 @@ func (zc *ZillowCrawler) CrawlSearchDataByColly() {
 
 	zc.CZillow.OnResponse(func(r *colly.Response) {
 		currentUrl := r.Ctx.Get("currentURL")
-		data := &SearchPageRes{}
+		data := &schemas.SearchPageRes{}
 		if err := json.Unmarshal(r.Body, data); err != nil {
 			zc.ShowLogInfo("Not found Json data when crawling by colly")
 			zc.SearchDataByCollyStatus = false
@@ -402,7 +400,7 @@ func (zc *ZillowCrawler) CrawlSearchData() error {
 	return nil
 }
 func (zc *ZillowCrawler) CrawlNextSearchData(urlRun string) (string, error) {
-	searchPageRes := &SearchPageRes{}
+	searchPageRes := &schemas.SearchPageRes{}
 	if err := zc.WebDriver.Get(urlRun); err != nil {
 		return "", err
 	}
@@ -463,7 +461,7 @@ func (zc *ZillowCrawler) CrawlNextSearchData(urlRun string) (string, error) {
 	return "", nil
 }
 
-func (zc *ZillowCrawler) CrawlZillowSearchResultData(result SearchPageResResult) *entity.ZillowDetail {
+func (zc *ZillowCrawler) CrawlZillowSearchResultData(result schemas.SearchPageResResult) *entity.ZillowDetail {
 
 	propertyStatus := false
 	if result.Beds > 0 || result.Baths > 0 {
@@ -486,7 +484,7 @@ func (zc *ZillowCrawler) CrawlZillowSearchResultData(result SearchPageResResult)
 
 }
 
-func (zc *ZillowCrawler) CrawlZillowSearchRelaxedData(result SearchPageResRelaxedResult) *entity.ZillowDetail {
+func (zc *ZillowCrawler) CrawlZillowSearchRelaxedData(result schemas.SearchPageResRelaxedResult) *entity.ZillowDetail {
 
 	propertyStatus := false
 	if result.Beds > 0 || result.Baths > 0 {
@@ -1536,7 +1534,7 @@ func (zc *ZillowCrawler) ParseMapBounds(doc *html.Node) {
 	}
 	mapBoundsMap := mapBounds.(map[string]interface{})
 
-	zc.CrawlerTables.MapBounds = &MapBounds{
+	zc.CrawlerTables.MapBounds = &schemas.MapBounds{
 		West:  mapBoundsMap["west"].(float64),
 		East:  mapBoundsMap["east"].(float64),
 		South: mapBoundsMap["south"].(float64),

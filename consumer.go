@@ -21,7 +21,7 @@ func init() {
 	}
 }
 
-func main_test() {
+func main() {
 	// Init logger
 	workerLog := initialization.InitLogger(
 		map[string]interface{}{"Logger": "Crawling Address"},
@@ -60,7 +60,7 @@ func main_test() {
 	go func() {
 		for message := range messages {
 			// For example, show received message in a console.
-			workerLog.Info(fmt.Sprintf(" > Received message: %s\n", message.Body))
+			go workerLog.Info(fmt.Sprintf(" > Received message: %s\n", message.Body))
 			utils := helper.NewUtils()
 			//if body, err := utils.Deserialize(message.Body); err != nil {
 			//	log.Printf(" > Errors: %s\n", err.Error())
@@ -68,11 +68,11 @@ func main_test() {
 			body, _ := utils.Deserialize(message.Body)
 
 			if body["worker"] == viper.GetString("crawler.rabbitmq.tasks.crawl_address.routing_key") {
-				crawlerTask := &schemas.CrawlerTask{}
+				crawlerTask := &schemas.ZillowCrawlerTask{}
 				if err := redis.GetRedis(body["task_id"].(string), crawlerTask); err != nil {
 					workerLog.Error(err.Error())
 				} else {
-					go zillowProcessor.CrawlZillowDataByAPI(body["address"].(string), crawlerTask, redis)
+					zillowProcessor.CrawlZillowDataByAPI(body["address"].(string), crawlerTask, redis)
 				}
 
 			}

@@ -48,7 +48,7 @@ func (cd *CrawlerDelivery) Crawl(w http.ResponseWriter, r *http.Request) {
 
 	utils := helper.NewUtils()
 
-	object := schemas.CrawlerTask{
+	object := schemas.ZillowCrawlerTask{
 		Status:  viper.GetString("crawler.crawler_status.start"),
 		TaskID:  redisId.String(),
 		Address: data.Address,
@@ -75,7 +75,7 @@ func (cd *CrawlerDelivery) Crawl(w http.ResponseWriter, r *http.Request) {
 }
 func (cd *CrawlerDelivery) CrawlerStatus(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "taskID")
-	crawlerTask := &schemas.CrawlerTask{}
+	crawlerTask := &schemas.ZillowCrawlerTask{}
 	if err := cd.Redis.GetRedis(taskID, crawlerTask); err != nil {
 		render.Render(w, r, schemas.ErrNotFound(err))
 		return
