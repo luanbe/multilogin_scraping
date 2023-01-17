@@ -386,11 +386,11 @@ type ZillowData struct {
 }
 
 type ZillowCrawlerTask struct {
-	Status        string               `json:"status"`
-	TaskID        string               `json:"task_id"`
-	Address       string               `json:"address"`
-	Error         string               `json:"error"`
-	RealtorDetail *entity.ZillowDetail `json:"zillow_detail"`
+	Status       string               `json:"status"`
+	TaskID       string               `json:"task_id"`
+	Address      string               `json:"address"`
+	Error        string               `json:"error"`
+	ZillowDetail *entity.ZillowDetail `json:"zillow_detail"`
 }
 
 func (cr *ZillowCrawlerTask) Render(w http.ResponseWriter, r *http.Request) error {

@@ -1,6 +1,7 @@
 package realtor
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/gocolly/colly"
 	"github.com/icrowley/fake"
@@ -16,15 +17,14 @@ import (
 )
 
 type RealtorCrawler struct {
-	WebDriver               selenium.WebDriver
-	BaseSel                 *crawlers.BaseSelenium
-	Profile                 *crawlers.Profile
-	CZillow                 *colly.Collector
-	Logger                  *zap.Logger
-	CrawlerBlocked          bool
-	BrowserTurnOff          bool
-	SearchDataByCollyStatus bool
-	CrawlerTables           *CrawlerTables
+	WebDriver      selenium.WebDriver
+	BaseSel        *crawlers.BaseSelenium
+	Profile        *crawlers.Profile
+	CRealtor       *colly.Collector
+	Logger         *zap.Logger
+	CrawlerBlocked bool
+	BrowserTurnOff bool
+	CrawlerTables  *CrawlerTables
 }
 
 type CrawlerTables struct {
@@ -65,10 +65,13 @@ func NewRealtorCrawler(
 		WebDriver:      BaseSel.WebDriver,
 		BaseSel:        BaseSel,
 		Profile:        BaseSel.Profile,
-		CZillow:        c,
+		CRealtor:       c,
 		Logger:         logger,
 		CrawlerBlocked: false,
 		BrowserTurnOff: false,
+		CrawlerTables: &CrawlerTables{
+			RealtorData: &schemas.RealtorData{},
+		},
 	}, nil
 }
 
@@ -142,4 +145,39 @@ func (rc *RealtorCrawler) IsVerifyHuman(pageSource string) bool {
 		return true
 	}
 	return false
+}
+
+func (rc *RealtorCrawler) CrawlSearchDataByColly() {
+	cookies, err := rc.BaseSel.GetHttpCookies()
+	if err != nil {
+		rc.Logger.Error(err.Error())
+		return
+	}
+	searchPageJson, err := json.Marshal(rc.SearchPageReq)
+	if err != nil {
+		zc.SearchDataByCollyStatus = false
+		zc.ShowLogError(err.Error())
+		return
+	}
+
+	err = rc.CRealtor.SetCookies(urlNextPage, cookies)
+	if err != nil {
+		rc.Logger.Error(err.Error())
+		return
+	}
+	rc.CRealtor.OnError(func(r *colly.Response, err error) {
+		rc.Logger.Error(fmt.Sprint("HTTP Status code:", r.StatusCode, "|URL:", r.Request.URL, "|Errors:", err))
+		return
+	})
+	rc.CRealtor.OnRequest(func(r *colly.Request) {
+		r.Headers.Set("Content-Type", "application/json")
+		r.Ctx.Put("currentURL", r.URL.String())
+	})
+	urlRun := fmt.Sprintf(searchURL, string(searchPageJson))
+	err = zc.CZillow.SetCookies(urlRun, cookies)
+	if err != nil {
+		zc.SearchDataByCollyStatus = false
+		zc.ShowLogError(err.Error())
+		return
+	}
 }

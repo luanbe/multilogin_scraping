@@ -4,6 +4,37 @@ import (
 	"net/http"
 )
 
+type RealtorSearchPageReq struct {
+	Input     string `json:"input"`
+	ClientID  string `json:"client_id"`
+	Limit     int    `json:"limit"`
+	AreaTypes string `json:"areaTypes"`
+}
+type RealtorSearchPageRes struct {
+	Meta struct {
+		Version string `json:"version"`
+		EsTook  int    `json:"es_took"`
+	} `json:"meta"`
+	Autocomplete []struct {
+		AreaType    string   `json:"area_type"`
+		ID          string   `json:"_id"`
+		Score       float64  `json:"_score"`
+		MprID       string   `json:"mpr_id"`
+		FullAddress []string `json:"full_address"`
+		Line        string   `json:"line"`
+		City        string   `json:"city"`
+		PostalCode  string   `json:"postal_code"`
+		StateCode   string   `json:"state_code"`
+		Country     string   `json:"country"`
+		Centroid    struct {
+			Lon float64 `json:"lon"`
+			Lat float64 `json:"lat"`
+		} `json:"centroid"`
+		PropStatus     []string `json:"prop_status"`
+		ValidationCode []string `json:"validation_code"`
+	} `json:"autocomplete"`
+}
+
 type RealtorData struct {
 	URL                        string
 	Address                    string

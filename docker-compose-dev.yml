@@ -36,7 +36,8 @@ services:
     environment:
       - PMA_HOST=mariadb
       - PMA_PORT=3306
-      - UPLOAD_LIMIT=300M
+      - UPLOAD_LIMIT=5000M
+      - MEMORY_LIMIT=5000M
     depends_on:
       - mariadb
     networks:

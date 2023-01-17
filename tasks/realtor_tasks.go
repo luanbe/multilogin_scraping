@@ -17,18 +17,7 @@ type RealtorProcessor struct {
 	Logger *zap.Logger
 }
 
-func (rp RealtorProcessor) CrawlRealtorDataByAPI(address string, crawlerTask *schemas.RealtorCrawlerTask, redis helper.RedisCache) {
-	var proxies []util2.Proxy
-	// load proxies file
-	proxies, err := util2.GetProxies(viper.GetString("crawler.proxy_path"))
-	if err != nil {
-		rp.Logger.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
-	}
-
-	go rp.RunRealtorCrawlerAPI(address, proxies[util2.RandIntRange(0, len(proxies))], crawlerTask, redis)
-}
-
-func (rp RealtorProcessor) RunRealtorCrawlerAPI(
+func (rp RealtorProcessor) NewRealtorApiTask(
 	address string,
 	proxy util2.Proxy,
 	crawlerTask *schemas.RealtorCrawlerTask,

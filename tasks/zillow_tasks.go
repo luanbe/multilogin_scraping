@@ -140,7 +140,7 @@ func (Zillow ZillowProcessor) RunCrawler(
 func (zp ZillowProcessor) CrawlZillowDataByAPI(address string, crawlerTask *schemas.ZillowCrawlerTask, redis helper.RedisCache) {
 	var proxies []util2.Proxy
 	// load proxies file
-	proxies, err := util2.GetProxies(viper.GetString("crawler.zillow_crawler.proxy_path"))
+	proxies, err := util2.GetProxies(viper.GetString("crawler.proxy_path"))
 	if err != nil {
 		zp.Logger.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
 	}
