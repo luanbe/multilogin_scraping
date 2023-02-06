@@ -114,7 +114,7 @@ func (Zillow ZillowProcessor) RunCrawler(
 			maindb3DataList,
 			Zillow.Logger,
 			onlyHistoryTable,
-			proxy,
+			&proxy,
 		)
 		if err != nil {
 			Zillow.Logger.Error(err.Error())
@@ -163,7 +163,7 @@ func (zp ZillowProcessor) RunZillowCrawlerAPI(
 			maindb3DataList,
 			zp.Logger,
 			false,
-			proxy,
+			&proxy,
 		)
 		if err != nil {
 			zp.Logger.Error(err.Error())

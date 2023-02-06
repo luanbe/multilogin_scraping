@@ -5,10 +5,10 @@ import (
 )
 
 type RealtorSearchPageReq struct {
-	Input     string `json:"input"`
-	ClientID  string `json:"client_id"`
-	Limit     int    `json:"limit"`
-	AreaTypes string `json:"areaTypes"`
+	Input     string `json:"input" url:"input"`
+	ClientID  string `json:"client_id" url:"client_id"`
+	Limit     int    `json:"limit" url:"limit"`
+	AreaTypes string `json:"area_types" url:"area_types"`
 }
 type RealtorSearchPageRes struct {
 	Meta struct {

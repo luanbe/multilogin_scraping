@@ -12,7 +12,7 @@ type MapBounds struct {
 	North float64 `json:"north"`
 }
 
-type SearchPageReq struct {
+type ZillowSearchPageReq struct {
 	MapBounds    *MapBounds `json:"mapBounds"`
 	IsMapVisible bool       `json:"isMapVisible"`
 	FilterState  struct {
@@ -29,7 +29,7 @@ type SearchPageReq struct {
 		CurrentPage int `json:"currentPage"`
 	} `json:"pagination"`
 }
-type SearchPageResResult struct {
+type ZillowSearchPageResResult struct {
 	Zpid                  string      `json:"zpid"`
 	ID                    string      `json:"id"`
 	ProviderListingID     interface{} `json:"providerListingId"`
@@ -126,7 +126,7 @@ type SearchPageResResult struct {
 	LotAreaString              string      `json:"lotAreaString,omitempty"`
 }
 
-type SearchPageResRelaxedResult struct {
+type ZillowSearchPageResRelaxedResult struct {
 	Zpid                 string      `json:"zpid"`
 	ID                   string      `json:"id"`
 	ProviderListingID    interface{} `json:"providerListingId"`
@@ -216,7 +216,7 @@ type SearchPageResRelaxedResult struct {
 	BrokerName                 string      `json:"brokerName,omitempty"`
 }
 
-type SearchPageRes struct {
+type ZillowSearchPageRes struct {
 	User struct {
 		IsLoggedIn                    bool        `json:"isLoggedIn"`
 		HasHousingConnectorPermission bool        `json:"hasHousingConnectorPermission"`
@@ -248,13 +248,13 @@ type SearchPageRes struct {
 	RequestID int `json:"requestId"`
 	Cat1      struct {
 		SearchResults struct {
-			ListResults        []SearchPageResResult        `json:"listResults"`
-			ResultsHash        string                       `json:"resultsHash"`
-			HomeRecCount       int                          `json:"homeRecCount"`
-			ShowForYouCount    int                          `json:"showForYouCount"`
-			MapResults         []interface{}                `json:"mapResults"`
-			RelaxedResults     []SearchPageResRelaxedResult `json:"relaxedResults"`
-			RelaxedResultsHash string                       `json:"relaxedResultsHash"`
+			ListResults        []ZillowSearchPageResResult        `json:"listResults"`
+			ResultsHash        string                             `json:"resultsHash"`
+			HomeRecCount       int                                `json:"homeRecCount"`
+			ShowForYouCount    int                                `json:"showForYouCount"`
+			MapResults         []interface{}                      `json:"mapResults"`
+			RelaxedResults     []ZillowSearchPageResRelaxedResult `json:"relaxedResults"`
+			RelaxedResultsHash string                             `json:"relaxedResultsHash"`
 		} `json:"searchResults"`
 		SearchList struct {
 			ExpansionDistance  int         `json:"expansionDistance"`

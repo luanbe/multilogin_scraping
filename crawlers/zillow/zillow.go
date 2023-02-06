@@ -30,7 +30,7 @@ type ZillowCrawler struct {
 	BaseSel                 *crawlers.BaseSelenium
 	Profile                 *crawlers.Profile
 	CZillow                 *colly.Collector
-	SearchPageReq           *schemas.SearchPageReq
+	SearchPageReq           *schemas.ZillowSearchPageReq
 	CrawlerTables           *CrawlerTables
 	CrawlerServices         CrawlerServices
 	Logger                  *zap.Logger
@@ -63,7 +63,7 @@ func NewZillowCrawler(
 	maindb3List []*entity.ZillowMaindb3Address,
 	logger *zap.Logger,
 	onlyHistoryTable bool,
-	proxy util2.Proxy,
+	proxy *util2.Proxy,
 ) (*ZillowCrawler, error) {
 	BaseSel := crawlers.NewBaseSelenium(logger)
 	if err := BaseSel.StartSelenium("zillow", proxy, viper.GetBool("crawler.zillow_crawler.proxy_status")); err != nil {
@@ -178,7 +178,7 @@ func (zc *ZillowCrawler) RunZillowCrawlerAPI(address string) error {
 					return err
 				}
 				// TODO: Update error for crawling data here
-				//if err = zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerTables.Maindb3, viper.GetString("crawler.crawler_status.failed")); err != nil {
+				//if err = zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerSchemas.Maindb3, viper.GetString("crawler.crawler_status.failed")); err != nil {
 				//	return err
 				//}
 			}
@@ -271,7 +271,7 @@ func (zc *ZillowCrawler) CrawlSearchDataByColly() {
 
 	zc.CZillow.OnResponse(func(r *colly.Response) {
 		currentUrl := r.Ctx.Get("currentURL")
-		data := &schemas.SearchPageRes{}
+		data := &schemas.ZillowSearchPageRes{}
 		if err := json.Unmarshal(r.Body, data); err != nil {
 			zc.ShowLogInfo("Not found Json data when crawling by colly")
 			zc.SearchDataByCollyStatus = false
@@ -400,7 +400,7 @@ func (zc *ZillowCrawler) CrawlSearchData() error {
 	return nil
 }
 func (zc *ZillowCrawler) CrawlNextSearchData(urlRun string) (string, error) {
-	searchPageRes := &schemas.SearchPageRes{}
+	searchPageRes := &schemas.ZillowSearchPageRes{}
 	if err := zc.WebDriver.Get(urlRun); err != nil {
 		return "", err
 	}
@@ -461,7 +461,7 @@ func (zc *ZillowCrawler) CrawlNextSearchData(urlRun string) (string, error) {
 	return "", nil
 }
 
-func (zc *ZillowCrawler) CrawlZillowSearchResultData(result schemas.SearchPageResResult) *entity.ZillowDetail {
+func (zc *ZillowCrawler) CrawlZillowSearchResultData(result schemas.ZillowSearchPageResResult) *entity.ZillowDetail {
 
 	propertyStatus := false
 	if result.Beds > 0 || result.Baths > 0 {
@@ -484,7 +484,7 @@ func (zc *ZillowCrawler) CrawlZillowSearchResultData(result schemas.SearchPageRe
 
 }
 
-func (zc *ZillowCrawler) CrawlZillowSearchRelaxedData(result schemas.SearchPageResRelaxedResult) *entity.ZillowDetail {
+func (zc *ZillowCrawler) CrawlZillowSearchRelaxedData(result schemas.ZillowSearchPageResRelaxedResult) *entity.ZillowDetail {
 
 	propertyStatus := false
 	if result.Beds > 0 || result.Baths > 0 {
@@ -544,14 +544,14 @@ func (zc *ZillowCrawler) CrawlAddress(address string) error {
 	}
 
 	// Begin to Crawl map data
-	//zc.CrawlSearchDataByColly()
+	//zc.CrawlSearchData()
 	//if zc.SearchDataByCollyStatus == false {
 	//	if err := zc.CrawlSearchData(); err != nil {
 	//		return err
 	//	}
 	//}
-	//if len(zc.CrawlerTables.ZillowSearchData) > 0 {
-	//	for _, v := range zc.CrawlerTables.ZillowSearchData {
+	//if len(zc.CrawlerSchemas.ZillowSearchData) > 0 {
+	//	for _, v := range zc.CrawlerSchemas.ZillowSearchData {
 	//		zillowData, err := zc.CrawlerServices.ZillowService.GetZillowByURL(v.URL)
 	//		if err != nil {
 	//			return err

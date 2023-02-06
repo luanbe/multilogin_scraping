@@ -114,8 +114,8 @@ func main() {
 
 	go func() {
 		realtorProcessor.NewRealtorApiTask(
-			"823 Lake Grove Dr, Little Elm,\" + \"TX 75068",
-			proxies[util2.RandIntRange(0, len(proxies))],
+			"2128 Megan Creek Dr Little Elm TX 75068",
+			&proxies[util2.RandIntRange(0, len(proxies))],
 			realtorTask,
 			redis,
 		)

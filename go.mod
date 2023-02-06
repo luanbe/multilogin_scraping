@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/alexedwards/scs/v2 v2.5.0
-	github.com/antchfx/htmlquery v1.2.5
+	github.com/antchfx/htmlquery v1.2.6
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-chi/render v1.0.2
 	github.com/go-co-op/gocron v1.18.0
@@ -12,6 +12,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gocolly/colly v1.2.0
 	github.com/gofrs/uuid v4.3.1+incompatible
+	github.com/google/go-querystring v1.1.0
 	github.com/hibiken/asynq v0.24.0
 	github.com/icrowley/fake v0.0.0-20221112152111-d7b7e2276db2
 	github.com/rabbitmq/amqp091-go v1.5.0
@@ -30,8 +31,8 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/ajg/form v1.5.1 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
-	github.com/antchfx/xmlquery v1.3.13 // indirect
-	github.com/antchfx/xpath v1.2.1 // indirect
+	github.com/antchfx/xmlquery v1.3.14 // indirect
+	github.com/antchfx/xpath v1.2.2 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/corpix/uarand v0.2.0 // indirect
@@ -68,7 +69,7 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/subosito/gotenv v1.4.1 // indirect
+	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	github.com/vmihailenco/go-tinylfu v0.2.2 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.4 // indirect

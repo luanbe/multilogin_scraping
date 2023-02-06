@@ -16,12 +16,12 @@ import (
 
 type Profile struct {
 	Name        string
-	Status      string      `json:"status"`
-	Value       string      `json:"value"`
-	UUID        string      `json:"uuid"`
-	BrowserName string      `json:"browser_name"`
-	Proxy       util2.Proxy `json:"proxy"`
-	ProxyStatus bool        `json:"proxy_status"`
+	Status      string       `json:"status"`
+	Value       string       `json:"value"`
+	UUID        string       `json:"uuid"`
+	BrowserName string       `json:"browser_name"`
+	Proxy       *util2.Proxy `json:"proxy"`
+	ProxyStatus bool         `json:"proxy_status"`
 }
 
 type BaseSelenium struct {
@@ -35,7 +35,7 @@ type BaseProfileInit struct {
 	Browser string `json:"browser"`
 	OS      string `json:"os"`
 	Network struct {
-		Proxy util2.Proxy `json:"proxy"`
+		Proxy *util2.Proxy `json:"proxy"`
 	} `json:"network"`
 }
 
@@ -97,6 +97,9 @@ func (ps *Profile) FetchProfile() error {
 	if err != nil {
 		return err
 	}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("Error on fetch profile: ", resp.Status)
+	}
 	defer resp.Body.Close()
 
 	// Decode data
@@ -118,7 +121,7 @@ func (ps *Profile) DeleteProfile() error {
 	return nil
 }
 
-func (bs *BaseSelenium) StartSelenium(profileName string, proxy util2.Proxy, proxyStatus bool) error {
+func (bs *BaseSelenium) StartSelenium(profileName string, proxy *util2.Proxy, proxyStatus bool) error {
 	ps := &Profile{Name: profileName, Proxy: proxy, ProxyStatus: proxyStatus}
 	if err := ps.CreateProfile(); err != nil {
 		return err
