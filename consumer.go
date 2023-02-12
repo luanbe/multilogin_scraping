@@ -84,7 +84,7 @@ func main2() {
 	<-forever
 }
 
-func main() {
+func main3() {
 	// Init logger
 	workerLog := initialization.InitLogger(
 		map[string]interface{}{"Logger": "Crawling Address"},
@@ -117,6 +117,46 @@ func main() {
 			"2128 Megan Creek Dr Little Elm TX 75068",
 			&proxies[util2.RandIntRange(0, len(proxies))],
 			realtorTask,
+			redis,
+		)
+	}()
+	<-forever
+
+}
+
+func main() {
+	// Init logger
+	workerLog := initialization.InitLogger(
+		map[string]interface{}{"Logger": "Crawling Address"},
+		viper.GetString("crawler.workers.log_file"),
+	)
+	db, err := initialization.InitDb()
+	if err != nil {
+		workerLog.Fatal(err.Error())
+	}
+	movotoProcessor := tasks.MovotoProcessor{DB: db, Logger: workerLog}
+	movotoTask := &schemas.MovotoCrawlerTask{}
+	redis := helper.NewRedisCache(
+		viper.GetString("crawler.redis.address"),
+		"",
+		viper.GetInt("crawler.redis.db"),
+		workerLog,
+	)
+
+	var proxies []util2.Proxy
+	// load proxies file
+	proxies, err = util2.GetProxies(viper.GetString("crawler.proxy_path"))
+	if err != nil {
+		workerLog.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
+	}
+
+	forever := make(chan bool)
+
+	go func() {
+		movotoProcessor.NewMovotoApiTask(
+			"2128 Megan Creek Dr Little Elm TX 75068",
+			&proxies[util2.RandIntRange(0, len(proxies))],
+			movotoTask,
 			redis,
 		)
 	}()

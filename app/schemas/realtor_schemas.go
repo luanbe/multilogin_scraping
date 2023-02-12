@@ -40,7 +40,7 @@ type RealtorData struct {
 	Address                    string
 	PropertyStatus             bool
 	Bed                        int
-	Bath                       float64
+	Bath                       int
 	FullBathrooms              float64
 	HalfBathrooms              float64
 	SF                         float64
@@ -72,7 +72,7 @@ type RealtorData struct {
 	CentralAir                 bool
 	OfGarageSpaces             string
 	HOAAmount                  string
-	LotSizeSF                  string
+	LotSizeSF                  float64
 	LotSizeAcres               string
 	BuyerAgentFee              string
 	Appliances                 string
