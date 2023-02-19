@@ -2,14 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/go-co-op/gocron"
 	"github.com/spf13/viper"
-	"gorm.io/gorm"
 	"log"
+	"multilogin_scraping/helper"
 	"multilogin_scraping/initialization"
-	"multilogin_scraping/tasks"
 	"net/http"
-	"time"
 )
 
 func init() {
@@ -41,37 +38,26 @@ func main() {
 	// Int Session Manager
 	sessionManager := initialization.IntSessionManager()
 
-	// Int Router
-	router := initialization.InitRouting(db, sessionManager)
+	// Int RabbitMQ
+	rabbitMQ := helper.NewRabbitMQ(viper.GetString("crawler.rabbitmq.url"), logger)
+	defer rabbitMQ.CloseRabbitMQ()
 
-	if err := PeriodicTasks(db); err != nil {
-		logger.Fatal(err.Error())
-	}
+	//Int Redis
+	redis := helper.NewRedisCache(
+		viper.GetString("crawler.redis.address"),
+		"",
+		viper.GetInt("crawler.redis.db"),
+		logger,
+	)
+
+	// Int Router
+	router := initialization.InitRouting(db, sessionManager, rabbitMQ, redis)
 
 	logger.Info(fmt.Sprintf("Server START on port%v", viper.GetString("server.address")))
+
 	log.Fatal(http.ListenAndServe(
 		viper.GetString("server.address"),
 		sessionManager.LoadAndSave(router),
 	))
 
-}
-
-func PeriodicTasks(db *gorm.DB) error {
-	s := gocron.NewScheduler(time.UTC)
-	zillowLogger := initialization.InitLogger(
-		map[string]interface{}{"Logger": "Zillow"},
-		viper.GetString("crawler.zillow_crawler.log_file"),
-	)
-
-	s.SetMaxConcurrentJobs(viper.GetInt("crawler.workers.concurrent"), gocron.RescheduleMode)
-	_, err := s.Every(viper.GetString("crawler.zillow_crawler.periodic_run")).SingletonMode().Do(tasks.RunCrawler, db, zillowLogger, false)
-	if err != nil {
-		return err
-	}
-	_, err = s.Every(viper.GetString("crawler.zillow_crawler.periodic_interval")).SingletonMode().Do(tasks.RunCrawler, db, zillowLogger, true)
-	if err != nil {
-		return err
-	}
-	s.StartAsync()
-	return nil
 }

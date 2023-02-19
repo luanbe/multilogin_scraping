@@ -3,16 +3,18 @@ package tasks
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gocolly/colly"
 	"github.com/hibiken/asynq"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"multilogin_scraping/app/models/entity"
 	"multilogin_scraping/app/registry"
+	"multilogin_scraping/app/schemas"
 	"multilogin_scraping/crawlers/zillow"
+	"multilogin_scraping/helper"
 	util2 "multilogin_scraping/pkg/utils"
 	"sync"
+	"time"
 )
 
 const (
@@ -28,7 +30,10 @@ type ZillowProcessor struct {
 }
 
 func NewZillowProcessor(db *gorm.DB, logger *zap.Logger) *ZillowProcessor {
-	return &ZillowProcessor{DB: db, Logger: logger}
+	return &ZillowProcessor{
+		DB:     db,
+		Logger: logger,
+	}
 }
 
 func NewZillowRedisTask() (*asynq.Task, error) {
@@ -39,10 +44,8 @@ func NewZillowRedisTask() (*asynq.Task, error) {
 	return asynq.NewTask(TypeZillowCrawler, payload), nil
 }
 
-func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger, onlyHistoryTable bool) {
-	c := colly.NewCollector()
-	maindb3Service := registry.RegisterMaindb3Service(db)
-	zillowService := registry.RegisterZillowService(db)
+func (Zillow ZillowProcessor) CrawlZillowData(onlyHistoryTable bool) {
+
 	var wg sync.WaitGroup
 	//noBrowser := viper.GetInt("crawler.zillow_crawler.no_browsers")
 	// TODO: We will add more browsers later when finding the method query multiple records at per concurrency
@@ -56,8 +59,10 @@ func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger, onlyHistoryTable bool) {
 	// load proxies file
 	proxies, err := util2.GetProxies(viper.GetString("crawler.zillow_crawler.proxy_path"))
 	if err != nil {
-		zillowLogger.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
+		Zillow.Logger.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
 	}
+
+	maindb3Service := registry.RegisterMaindb3Service(Zillow.DB)
 
 	wg.Add(noBrowser)
 	page := 0
@@ -83,39 +88,88 @@ func RunCrawler(db *gorm.DB, zillowLogger *zap.Logger, onlyHistoryTable bool) {
 		}
 
 		if err != nil {
-			zillowLogger.Error(err.Error())
+			Zillow.Logger.Error(err.Error())
 		}
 		if maindb3DataList == nil || len(maindb3DataList) < 1 {
-			zillowLogger.Info("Not found maindb3 data")
+			Zillow.Logger.Info("Not found maindb3 data")
 			return
 		}
-
-		go func(maindb3DataList []*entity.ZillowMaindb3Address, wg *sync.WaitGroup, proxy util2.Proxy) {
-			defer wg.Done()
-
-			for {
-				zillowCrawler, err := zillow.NewZillowCrawler(c, maindb3DataList, zillowService, maindb3Service, zillowLogger, onlyHistoryTable, proxy)
-				if err != nil {
-					zillowLogger.Error(err.Error())
-					continue
-				}
-				zillowLogger.Info(fmt.Sprint("Start crawler on Multilogin App: ", zillowCrawler.BaseSel.Profile.UUID))
-				if err := zillowCrawler.RunZillowCrawler(); err != nil {
-					zillowCrawler.ShowLogError(err.Error())
-					zillowCrawler.BaseSel.StopSessionBrowser(true)
-					if zillowCrawler.CrawlerBlocked == true {
-						continue
-					}
-					if zillowCrawler.BrowserTurnOff == true {
-						continue
-					}
-					break
-				}
-				zillowCrawler.BaseSel.StopSessionBrowser(true)
-				break
-			}
-		}(maindb3DataList, &wg, proxies[i])
+		// Begin to crawl data
+		go Zillow.RunCrawler(onlyHistoryTable, maindb3DataList, &wg, proxies[i])
 	}
 	wg.Wait()
 	return
+}
+func (Zillow ZillowProcessor) RunCrawler(
+	onlyHistoryTable bool,
+	maindb3DataList []*entity.ZillowMaindb3Address,
+	wg *sync.WaitGroup,
+	proxy util2.Proxy,
+) {
+	defer wg.Done()
+	zillowCrawler := zillow.NewZillowCrawler(
+		Zillow.DB,
+		maindb3DataList,
+		Zillow.Logger,
+		onlyHistoryTable,
+		&proxy,
+	)
+	for {
+		// We will start new browser here
+		// If browser creating is fail, use continue for creating new browser again
+		if err := zillowCrawler.NewBrowser(); err != nil {
+			Zillow.Logger.Error(err.Error())
+			continue
+		}
+
+		Zillow.Logger.Info(fmt.Sprint("Start crawler on Multilogin App: ", zillowCrawler.BaseSel.Profile.UUID))
+		if err := zillowCrawler.RunZillowCrawler(); err != nil {
+			zillowCrawler.ShowLogError(err.Error())
+			zillowCrawler.BaseSel.StopSessionBrowser(true)
+			if zillowCrawler.CrawlerBlocked == true {
+				continue
+			}
+			if zillowCrawler.BrowserTurnOff == true {
+				continue
+			}
+			break
+		}
+		zillowCrawler.BaseSel.StopSessionBrowser(true)
+		break
+	}
+}
+
+func (zp ZillowProcessor) NewZillowApiTask(
+	crawlerSearchRes *schemas.CrawlerSearchRes,
+	proxy *util2.Proxy,
+	redis helper.RedisCache,
+) {
+	var maindb3DataList []*entity.ZillowMaindb3Address
+	zillowCrawler := zillow.NewZillowCrawler(zp.DB, maindb3DataList, zp.Logger, false, proxy)
+	for {
+		// We will start new browser here
+		// If browser creating is fail, use continue for creating new browser again
+		if err := zillowCrawler.NewBrowser(); err != nil {
+			zp.Logger.Error(err.Error())
+			continue
+		}
+
+		zp.Logger.Info(fmt.Sprint("Start crawler on Multilogin App: ", zillowCrawler.BaseSel.Profile.UUID))
+		if err := zillowCrawler.RunZillowCrawlerAPI(crawlerSearchRes); err != nil {
+			zillowCrawler.ShowLogError(err.Error())
+			zillowCrawler.BaseSel.StopSessionBrowser(true)
+			if zillowCrawler.CrawlerBlocked == true || zillowCrawler.BrowserTurnOff == true {
+				continue
+			}
+			crawlerSearchRes.Zillow.Error = err.Error()
+			crawlerSearchRes.Zillow.Status = viper.GetString("crawler.crawler_status.failed")
+		} else {
+			crawlerSearchRes.Zillow.Status = viper.GetString("crawler.crawler_status.succeeded")
+			crawlerSearchRes.Zillow.Data = zillowCrawler.CrawlerTables.ZillowData
+
+		}
+		zillowCrawler.BaseSel.StopSessionBrowser(true)
+		break
+	}
+	redis.SetRedis(crawlerSearchRes.TaskID, crawlerSearchRes, time.Hour*1)
 }

@@ -20,3 +20,6 @@ config-*.json
 *.sql
 *.log
 *_proxies.txt
+
+bin
+proxies.txt

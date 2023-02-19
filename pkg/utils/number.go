@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -54,4 +55,14 @@ func ReformatMDNWithPrefiX(mdn string, prefixType int) string {
 	}
 
 	return mdn
+}
+
+func ConvertToFloat(text string) (float64, error) {
+	text = strings.Replace(text, "$", "", -1)
+	text = strings.Replace(text, ",", ".", -1)
+	f, err := strconv.ParseFloat(strings.TrimSpace(text), 64)
+	if err != nil {
+		return 0, err
+	}
+	return f, nil
 }

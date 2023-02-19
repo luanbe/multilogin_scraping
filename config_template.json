@@ -1,7 +1,7 @@
 {
   "debug": true,
   "server": {
-    "address": ":3000",
+    "address": ":3003",
     "location": "Asia/Jakarta"
   },
   "context": {
@@ -9,10 +9,10 @@
   },
   "database": {
     "driver": "mysql",
-    "host": "127.0.0.1",
-    "port": 40000,
-    "username": "root",
-    "password": "crawler",
+    "host": "72.167.50.253",
+    "port": 3306,
+    "username": "crawler_admin",
+    "password": "Mlbd6460?",
     "dbname": "multilogin_crawler",
     "logger_level": "silent"
   },
@@ -20,29 +20,65 @@
     "auth_user_key": "luabbe68"
   },
   "crawler": {
-    "debug": false,
+    "selenium_debug": false,
+    "log_level": "debug",
+    "disable_load_images": true,
+    "proxy_path": "./proxies.txt",
     "zillow_crawler": {
-      "no_browsers": 10,
-      "log_file": "./logs/zillow_crawler.log",
-      "crawl_next_time": 5,
-      "periodic_run":"2m",
-      "periodic_interval": "10m",
+      "url": "https://www.zillow.com/homes/",
+      "time_load_source": 5,
+      "crawl_next_time": 2,
+      "periodic_record_size": 1000,
+      "periodic_browser": 1,
+      "periodic_run": "3s",
+      "periodic_record_size_interval": 2000,
+      "periodic_browser_interval": 1,
+      "periodic_interval": "15m",
       "days_interval": 30,
-      "no_browsers_interval": 10
+      "log_file": "",
+      "retry_bypass_human": 3,
+      "proxy_status": true
     },
-    "multilogin_url": "http://localhost:35000",
+    "realtor_crawler": {
+      "url": "https://www.realtor.com/",
+      "time_load_source": 5,
+      "crawl_next_time": 2,
+      "periodic_record_size": 1000,
+      "periodic_browser": 1,
+      "periodic_run": "3s",
+      "periodic_record_size_interval": 2000,
+      "periodic_browser_interval": 1,
+      "periodic_interval": "15m",
+      "days_interval": 30,
+      "log_file": "",
+      "retry_bypass_human": 3,
+      "proxy_status": true
+    },
+    "multilogin_url": "http://127.0.0.1:35200",
     "crawler_status": {
       "succeeded": "crawled",
       "failed": "failed",
-      "rerun": "rerun"
+      "rerun": "rerun",
+      "start": "crawling"
     },
     "redis": {
       "address": "127.0.0.1:6379",
       "db": 0
     },
+    "rabbitmq": {
+      "url": "amqp://root:root@127.0.0.1:5672/",
+      "tasks": {
+        "crawl_address": {
+          "exchange_type": "topic",
+          "exchange_name": "crawler",
+          "queue_name": "crawl_address_queue",
+          "routing_key": "crawler.crawl_address"
+        }
+      }
+    },
     "workers": {
       "concurrent": 10,
-      "log_file": "./logs/tasks.log",
+      "log_file": "worker.log",
       "redis_task": false
     }
   }
