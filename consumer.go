@@ -22,7 +22,7 @@ func init() {
 	}
 }
 
-func main2() {
+func main() {
 	// Init logger
 	workerLog := initialization.InitLogger(
 		map[string]interface{}{"Logger": "Crawling Address"},
@@ -44,6 +44,8 @@ func main2() {
 	workerLog.Info("database connected")
 
 	zillowProcessor := tasks.ZillowProcessor{DB: db, Logger: workerLog}
+	realtorProcessor := tasks.RealtorProcessor{DB: db, Logger: workerLog}
+	movotoProcessor := tasks.MovotoProcessor{DB: db, Logger: workerLog}
 
 	r := helper.NewRabbitMQ(viper.GetString("crawler.rabbitmq.url"), workerLog)
 	messages, rabbitHelper := r.ConsumeMessage(
@@ -54,6 +56,12 @@ func main2() {
 	)
 	defer rabbitHelper.Connect.Close()
 	defer rabbitHelper.Channel.Close()
+
+	// load proxies file
+	proxies, err := util2.GetProxies(viper.GetString("crawler.proxy_path"))
+	if err != nil {
+		workerLog.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
+	}
 
 	// Make a channel to receive messages into infinite loop.
 	forever := make(chan bool)
@@ -69,11 +77,26 @@ func main2() {
 			body, _ := utils.Deserialize(message.Body)
 
 			if body["worker"] == viper.GetString("crawler.rabbitmq.tasks.crawl_address.routing_key") {
-				crawlerTask := &schemas.ZillowCrawlerTask{}
-				if err := redis.GetRedis(body["task_id"].(string), crawlerTask); err != nil {
+				crawlerSearchRes := &schemas.CrawlerSearchRes{}
+				if err := redis.GetRedis(body["task_id"].(string), crawlerSearchRes); err != nil {
 					workerLog.Error(err.Error())
 				} else {
-					zillowProcessor.CrawlZillowDataByAPI(body["address"].(string), crawlerTask, redis)
+					go zillowProcessor.NewZillowApiTask(
+						crawlerSearchRes,
+						&proxies[util2.RandIntRange(0, len(proxies))],
+						redis,
+					)
+					go realtorProcessor.NewRealtorApiTask(
+						crawlerSearchRes,
+						&proxies[util2.RandIntRange(0, len(proxies))],
+						redis,
+					)
+					go movotoProcessor.NewMovotoApiTask(
+						crawlerSearchRes,
+						&proxies[util2.RandIntRange(0, len(proxies))],
+						redis,
+					)
+
 				}
 
 			}
@@ -82,84 +105,4 @@ func main2() {
 	}()
 
 	<-forever
-}
-
-func main3() {
-	// Init logger
-	workerLog := initialization.InitLogger(
-		map[string]interface{}{"Logger": "Crawling Address"},
-		viper.GetString("crawler.workers.log_file"),
-	)
-	db, err := initialization.InitDb()
-	if err != nil {
-		workerLog.Fatal(err.Error())
-	}
-	realtorProcessor := tasks.RealtorProcessor{DB: db, Logger: workerLog}
-	realtorTask := &schemas.RealtorCrawlerTask{}
-	redis := helper.NewRedisCache(
-		viper.GetString("crawler.redis.address"),
-		"",
-		viper.GetInt("crawler.redis.db"),
-		workerLog,
-	)
-
-	var proxies []util2.Proxy
-	// load proxies file
-	proxies, err = util2.GetProxies(viper.GetString("crawler.proxy_path"))
-	if err != nil {
-		workerLog.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
-	}
-
-	forever := make(chan bool)
-
-	go func() {
-		realtorProcessor.NewRealtorApiTask(
-			"2128 Megan Creek Dr Little Elm TX 75068",
-			&proxies[util2.RandIntRange(0, len(proxies))],
-			realtorTask,
-			redis,
-		)
-	}()
-	<-forever
-
-}
-
-func main() {
-	// Init logger
-	workerLog := initialization.InitLogger(
-		map[string]interface{}{"Logger": "Crawling Address"},
-		viper.GetString("crawler.workers.log_file"),
-	)
-	db, err := initialization.InitDb()
-	if err != nil {
-		workerLog.Fatal(err.Error())
-	}
-	movotoProcessor := tasks.MovotoProcessor{DB: db, Logger: workerLog}
-	movotoTask := &schemas.MovotoCrawlerTask{}
-	redis := helper.NewRedisCache(
-		viper.GetString("crawler.redis.address"),
-		"",
-		viper.GetInt("crawler.redis.db"),
-		workerLog,
-	)
-
-	var proxies []util2.Proxy
-	// load proxies file
-	proxies, err = util2.GetProxies(viper.GetString("crawler.proxy_path"))
-	if err != nil {
-		workerLog.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
-	}
-
-	forever := make(chan bool)
-
-	go func() {
-		movotoProcessor.NewMovotoApiTask(
-			"2128 Megan Creek Dr Little Elm TX 75068",
-			&proxies[util2.RandIntRange(0, len(proxies))],
-			movotoTask,
-			redis,
-		)
-	}()
-	<-forever
-
 }

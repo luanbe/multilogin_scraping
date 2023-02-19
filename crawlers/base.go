@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/tebeka/selenium/chrome"
 	"go.uber.org/zap"
+	"multilogin_scraping/app/schemas"
 	util2 "multilogin_scraping/pkg/utils"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -46,11 +49,10 @@ func NewBaseSelenium(logger *zap.Logger) *BaseSelenium {
 var mlaUrl string = "/api/v1/profile/start?automation=true&profileId="
 var profileURL string = "/api/v2/profile/"
 
-func (ps *Profile) CreateProfile() error {
+func (ps *Profile) CreateProfile(browsers []string) error {
 	// Create random profile multilogin app
 	oses := []string{"win", "mac", "lin"}
 	//browsers := []string{"stealthfox", "mimic"}
-	browsers := []string{"stealthfox"}
 	//values := &map[string]string{
 	//	"name":    fmt.Sprint(ps.Name, "-Crawler-", util2.RandInt()),
 	//	"os":      util2.RandSliceStr(oses),
@@ -109,8 +111,39 @@ func (ps *Profile) FetchProfile() error {
 	return nil
 }
 
-func (ps *Profile) DeleteProfile() error {
-	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), profileURL, ps.UUID)
+func (ps *Profile) DeleteProfiles(profiles []string, logger *zap.Logger) error {
+	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), profileURL)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	var multiLoginProfiles schemas.MultiLoginProfile
+	if err != nil {
+		return err
+	}
+	res, err := http.DefaultClient.Do(req)
+
+	if err != nil {
+		return err
+	}
+
+	err = json.NewDecoder(res.Body).Decode(&multiLoginProfiles)
+	res.Body.Close()
+
+	if err != nil {
+		return err
+	}
+
+	for _, profile := range multiLoginProfiles {
+		for _, name := range profiles {
+			if strings.Contains(profile.Name, name) == true {
+				ps.DeleteProfile(profile.UUID)
+				logger.Info(fmt.Sprintf("Deleted MultiLogin Profile Name: %s", profile.Name))
+			}
+		}
+	}
+	return nil
+}
+
+func (ps *Profile) DeleteProfile(UUID string) error {
+	url := fmt.Sprint(viper.GetString("crawler.multilogin_url"), profileURL, UUID)
 	req, err := http.NewRequest(http.MethodDelete, url, nil)
 	if err != nil {
 		return err
@@ -121,9 +154,9 @@ func (ps *Profile) DeleteProfile() error {
 	return nil
 }
 
-func (bs *BaseSelenium) StartSelenium(profileName string, proxy *util2.Proxy, proxyStatus bool) error {
+func (bs *BaseSelenium) StartSelenium(profileName string, proxy *util2.Proxy, proxyStatus bool, browsers []string) error {
 	ps := &Profile{Name: profileName, Proxy: proxy, ProxyStatus: proxyStatus}
-	if err := ps.CreateProfile(); err != nil {
+	if err := ps.CreateProfile(browsers); err != nil {
 		return err
 	}
 	if ps.UUID == "" {
@@ -137,7 +170,7 @@ func (bs *BaseSelenium) StartSelenium(profileName string, proxy *util2.Proxy, pr
 	caps := selenium.Capabilities{}
 
 	//caps.AddFirefox(firefox.Capabilities{Args: []string{"--headless", "--no-sandbox"}})
-	//caps.AddChrome(chrome.Capabilities{Prefs: map[string]interface{}{"profile.managed_default_content_settings.images": 2}})
+	caps.AddChrome(chrome.Capabilities{Args: []string{"--disable-blink-features=AutomationControlled"}})
 	//caps.AddFirefox(firefox.Capabilities{Prefs: map[string]interface{}{"permissions.default.image": 2}})
 	// Connect to Selenium
 	wd, err := selenium.NewRemote(caps, ps.Value)
@@ -217,10 +250,6 @@ func (bs *BaseSelenium) StopSessionBrowser(browserQuit bool) error {
 		if err := bs.WebDriver.Quit(); err != nil {
 			return err
 		}
-	}
-	time.Sleep(5 * time.Second)
-	if err := bs.Profile.DeleteProfile(); err != nil {
-		return err
 	}
 	return nil
 }

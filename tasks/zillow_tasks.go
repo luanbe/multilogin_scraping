@@ -107,19 +107,21 @@ func (Zillow ZillowProcessor) RunCrawler(
 	proxy util2.Proxy,
 ) {
 	defer wg.Done()
-
+	zillowCrawler := zillow.NewZillowCrawler(
+		Zillow.DB,
+		maindb3DataList,
+		Zillow.Logger,
+		onlyHistoryTable,
+		&proxy,
+	)
 	for {
-		zillowCrawler, err := zillow.NewZillowCrawler(
-			Zillow.DB,
-			maindb3DataList,
-			Zillow.Logger,
-			onlyHistoryTable,
-			&proxy,
-		)
-		if err != nil {
+		// We will start new browser here
+		// If browser creating is fail, use continue for creating new browser again
+		if err := zillowCrawler.NewBrowser(); err != nil {
 			Zillow.Logger.Error(err.Error())
 			continue
 		}
+
 		Zillow.Logger.Info(fmt.Sprint("Start crawler on Multilogin App: ", zillowCrawler.BaseSel.Profile.UUID))
 		if err := zillowCrawler.RunZillowCrawler(); err != nil {
 			zillowCrawler.ShowLogError(err.Error())
@@ -137,57 +139,37 @@ func (Zillow ZillowProcessor) RunCrawler(
 	}
 }
 
-func (zp ZillowProcessor) CrawlZillowDataByAPI(address string, crawlerTask *schemas.ZillowCrawlerTask, redis helper.RedisCache) {
-	var proxies []util2.Proxy
-	// load proxies file
-	proxies, err := util2.GetProxies(viper.GetString("crawler.proxy_path"))
-	if err != nil {
-		zp.Logger.Fatal(fmt.Sprint("Loading proxy error:", err.Error()))
-	}
-
-	go zp.RunZillowCrawlerAPI(address, proxies[util2.RandIntRange(0, len(proxies))], crawlerTask, redis)
-}
-
-func (zp ZillowProcessor) RunZillowCrawlerAPI(
-	address string,
-	proxy util2.Proxy,
-	crawlerTask *schemas.ZillowCrawlerTask,
+func (zp ZillowProcessor) NewZillowApiTask(
+	crawlerSearchRes *schemas.CrawlerSearchRes,
+	proxy *util2.Proxy,
 	redis helper.RedisCache,
 ) {
-	// Delare a empty slice but we will not use it
 	var maindb3DataList []*entity.ZillowMaindb3Address
-
+	zillowCrawler := zillow.NewZillowCrawler(zp.DB, maindb3DataList, zp.Logger, false, proxy)
 	for {
-		zillowCrawler, err := zillow.NewZillowCrawler(
-			zp.DB,
-			maindb3DataList,
-			zp.Logger,
-			false,
-			&proxy,
-		)
-		if err != nil {
+		// We will start new browser here
+		// If browser creating is fail, use continue for creating new browser again
+		if err := zillowCrawler.NewBrowser(); err != nil {
 			zp.Logger.Error(err.Error())
 			continue
 		}
+
 		zp.Logger.Info(fmt.Sprint("Start crawler on Multilogin App: ", zillowCrawler.BaseSel.Profile.UUID))
-		if err := zillowCrawler.RunZillowCrawlerAPI(address); err != nil {
+		if err := zillowCrawler.RunZillowCrawlerAPI(crawlerSearchRes); err != nil {
 			zillowCrawler.ShowLogError(err.Error())
 			zillowCrawler.BaseSel.StopSessionBrowser(true)
-			if zillowCrawler.CrawlerBlocked == true {
+			if zillowCrawler.CrawlerBlocked == true || zillowCrawler.BrowserTurnOff == true {
 				continue
 			}
-			if zillowCrawler.BrowserTurnOff == true {
-				continue
-			}
-			crawlerTask.Error = err.Error()
-			crawlerTask.Status = viper.GetString("crawler.crawler_status.failed")
-			redis.SetRedis(crawlerTask.TaskID, crawlerTask, time.Hour*1)
+			crawlerSearchRes.Zillow.Error = err.Error()
+			crawlerSearchRes.Zillow.Status = viper.GetString("crawler.crawler_status.failed")
 		} else {
-			crawlerTask.Status = viper.GetString("crawler.crawler_status.succeeded")
-			crawlerTask.ZillowDetail = zillowCrawler.CrawlerTables.ZillowData
-			redis.SetRedis(crawlerTask.TaskID, crawlerTask, time.Hour*1)
+			crawlerSearchRes.Zillow.Status = viper.GetString("crawler.crawler_status.succeeded")
+			crawlerSearchRes.Zillow.Data = zillowCrawler.CrawlerTables.ZillowData
+
 		}
 		zillowCrawler.BaseSel.StopSessionBrowser(true)
 		break
 	}
+	redis.SetRedis(crawlerSearchRes.TaskID, crawlerSearchRes, time.Hour*1)
 }

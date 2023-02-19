@@ -42,19 +42,29 @@ func (cd *CrawlerDelivery) Crawl(w http.ResponseWriter, r *http.Request) {
 	}
 	msg := helper.Message{
 		"task_id": redisId.String(),
-		"address": data.Address,
+		"data":    data,
 		"worker":  viper.GetString("crawler.rabbitmq.tasks.crawl_address.routing_key"),
 	}
 
 	utils := helper.NewUtils()
 
-	object := schemas.ZillowCrawlerTask{
-		Status:  viper.GetString("crawler.crawler_status.start"),
-		TaskID:  redisId.String(),
-		Address: data.Address,
-		Error:   "",
+	crawlerSearchRes := schemas.CrawlerSearchRes{
+		TaskID: redisId.String(),
+		Search: data,
+		Zillow: &schemas.ZillowDetail{
+			Status: viper.GetString("crawler.crawler_status.start"),
+			Error:  "",
+		},
+		Realtor: &schemas.RealtorDetail{
+			Status: viper.GetString("crawler.crawler_status.start"),
+			Error:  "",
+		},
+		Movoto: &schemas.MovotoDetail{
+			Status: viper.GetString("crawler.crawler_status.start"),
+			Error:  "",
+		},
 	}
-	if err := cd.Redis.SetRedis(redisId.String(), object, time.Hour*1); err != nil {
+	if err := cd.Redis.SetRedis(redisId.String(), crawlerSearchRes, time.Hour*1); err != nil {
 		render.Render(w, r, schemas.ErrServer(err))
 		return
 	}
@@ -71,16 +81,15 @@ func (cd *CrawlerDelivery) Crawl(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render.Status(r, http.StatusOK)
-	render.Render(w, r, schemas.NewCrawlerResponse(redisId.String(), data.Address))
+	render.Render(w, r, schemas.NewCrawlerResponse(redisId.String(), crawlerSearchRes))
 }
 func (cd *CrawlerDelivery) CrawlerStatus(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "taskID")
-	crawlerTask := &schemas.ZillowCrawlerTask{}
+	crawlerTask := &schemas.CrawlerSearchRes{}
 	if err := cd.Redis.GetRedis(taskID, crawlerTask); err != nil {
 		render.Render(w, r, schemas.ErrNotFound(err))
 		return
 	}
 	render.Status(r, http.StatusOK)
 	render.Render(w, r, crawlerTask)
-
 }

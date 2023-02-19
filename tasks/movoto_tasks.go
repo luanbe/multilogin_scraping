@@ -19,16 +19,11 @@ type MovotoProcessor struct {
 
 // NewMovotoApiTask begin to start a new task
 func (rp MovotoProcessor) NewMovotoApiTask(
-	address string,
+	crawlerSearchRes *schemas.CrawlerSearchRes,
 	proxy *util2.Proxy,
-	crawlerTask *schemas.MovotoCrawlerTask,
 	redis helper.RedisCache,
 ) {
 	movotoCrawler := movoto.NewMovotoCrawler(rp.DB, rp.Logger, proxy)
-	mprID, err := movotoCrawler.CrawlSearchData(address)
-	if err != nil {
-		rp.Logger.Fatal(err.Error())
-	}
 
 	for {
 		// We will start new browser here
@@ -37,30 +32,35 @@ func (rp MovotoProcessor) NewMovotoApiTask(
 			rp.Logger.Error(err.Error())
 			continue
 		}
-
 		rp.Logger.Info(fmt.Sprint("Start crawler on Multilogin App: ", movotoCrawler.BaseSel.Profile.UUID))
-		if err := movotoCrawler.RunMovotoCrawlerAPI(mprID); err != nil {
-			movotoCrawler.Logger.Error(err.Error())
-			movotoCrawler.BaseSel.StopSessionBrowser(true)
+		searchRes, err := movotoCrawler.CrawlSearchData(crawlerSearchRes)
 
-			// if a browser is blocked or stopped, we will re-run it from a loop
-			if movotoCrawler.BrowserTurnOff == true || movotoCrawler.CrawlerBlocked == true {
-				continue
-			}
+		if err != nil {
+			crawlerSearchRes.Movoto.Error = err.Error()
+			crawlerSearchRes.Movoto.Status = viper.GetString("crawler.crawler_status.failed")
 
-			crawlerTask.Error = err.Error()
-			crawlerTask.Status = viper.GetString("crawler.crawler_status.failed")
-			if err = redis.SetRedis(crawlerTask.TaskID, crawlerTask, time.Hour*1); err != nil {
-				rp.Logger.Fatal(err.Error())
-			}
 		} else {
-			crawlerTask.Status = viper.GetString("crawler.crawler_status.succeeded")
-			crawlerTask.MovotoDetail = movotoCrawler.CrawlerSchemas.MovotoData
-			if err := redis.SetRedis(crawlerTask.TaskID, crawlerTask, time.Hour*1); err != nil {
-				rp.Logger.Fatal(err.Error())
+			if err := movotoCrawler.RunMovotoCrawlerAPI(searchRes); err != nil {
+				movotoCrawler.Logger.Error(err.Error())
+				movotoCrawler.BaseSel.StopSessionBrowser(true)
+
+				// if a browser is blocked or stopped, we will re-run it from a loop
+				if movotoCrawler.BrowserTurnOff == true || movotoCrawler.CrawlerBlocked == true {
+					continue
+				}
+
+				crawlerSearchRes.Movoto.Error = err.Error()
+				crawlerSearchRes.Movoto.Status = viper.GetString("crawler.crawler_status.failed")
+			} else {
+				crawlerSearchRes.Movoto.Status = viper.GetString("crawler.crawler_status.succeeded")
+				crawlerSearchRes.Movoto.Data = movotoCrawler.CrawlerSchemas.MovotoData
+
 			}
 		}
 		movotoCrawler.BaseSel.StopSessionBrowser(true)
 		break
+	}
+	if err := redis.SetRedis(crawlerSearchRes.TaskID, crawlerSearchRes, time.Hour*1); err != nil {
+		rp.Logger.Fatal(err.Error())
 	}
 }

@@ -19,48 +19,47 @@ type RealtorProcessor struct {
 
 // NewRealtorApiTask begin to start a new task
 func (rp RealtorProcessor) NewRealtorApiTask(
-	address string,
+	crawlerSearchRes *schemas.CrawlerSearchRes,
 	proxy *util2.Proxy,
-	crawlerTask *schemas.RealtorCrawlerTask,
 	redis helper.RedisCache,
 ) {
+
 	realtorCrawler := realtor.NewRealtorCrawler(rp.DB, rp.Logger, proxy)
-	mprID, err := realtorCrawler.CrawlSearchData(address)
+	mprID, err := realtorCrawler.CrawlSearchData(crawlerSearchRes)
 	if err != nil {
-		rp.Logger.Fatal(err.Error())
-	}
-
-	for {
-		// We will start new browser here
-		// If browser creating is fail, use continue for creating new browser again
-		if err := realtorCrawler.NewBrowser(); err != nil {
-			rp.Logger.Error(err.Error())
-			continue
-		}
-
-		rp.Logger.Info(fmt.Sprint("Start crawler on Multilogin App: ", realtorCrawler.BaseSel.Profile.UUID))
-		if err := realtorCrawler.RunRealtorCrawlerAPI(mprID); err != nil {
-			realtorCrawler.Logger.Error(err.Error())
-			realtorCrawler.BaseSel.StopSessionBrowser(true)
-
-			// if a browser is blocked or stopped, we will re-run it from a loop
-			if realtorCrawler.BrowserTurnOff == true || realtorCrawler.CrawlerBlocked == true {
+		crawlerSearchRes.Realtor.Error = err.Error()
+		crawlerSearchRes.Realtor.Status = viper.GetString("crawler.crawler_status.failed")
+	} else {
+		for {
+			// We will start new browser here
+			// If browser creating is fail, use continue for creating new browser again
+			if err := realtorCrawler.NewBrowser(); err != nil {
+				rp.Logger.Error(err.Error())
 				continue
 			}
 
-			crawlerTask.Error = err.Error()
-			crawlerTask.Status = viper.GetString("crawler.crawler_status.failed")
-			if err = redis.SetRedis(crawlerTask.TaskID, crawlerTask, time.Hour*1); err != nil {
-				rp.Logger.Fatal(err.Error())
+			rp.Logger.Info(fmt.Sprint("Start crawler on Multilogin App: ", realtorCrawler.BaseSel.Profile.UUID))
+			if err := realtorCrawler.RunRealtorCrawlerAPI(mprID); err != nil {
+				realtorCrawler.Logger.Error(err.Error())
+				realtorCrawler.BaseSel.StopSessionBrowser(true)
+
+				// if a browser is blocked or stopped, we will re-run it from a loop
+				if realtorCrawler.BrowserTurnOff == true || realtorCrawler.CrawlerBlocked == true {
+					continue
+				}
+
+				crawlerSearchRes.Realtor.Error = err.Error()
+				crawlerSearchRes.Realtor.Status = viper.GetString("crawler.crawler_status.failed")
+
+			} else {
+				crawlerSearchRes.Realtor.Status = viper.GetString("crawler.crawler_status.succeeded")
+				crawlerSearchRes.Realtor.Data = realtorCrawler.CrawlerSchemas.RealtorData
 			}
-		} else {
-			crawlerTask.Status = viper.GetString("crawler.crawler_status.succeeded")
-			crawlerTask.RealtorDetail = realtorCrawler.CrawlerSchemas.RealtorData
-			if err := redis.SetRedis(crawlerTask.TaskID, crawlerTask, time.Hour*1); err != nil {
-				rp.Logger.Fatal(err.Error())
-			}
+			realtorCrawler.BaseSel.StopSessionBrowser(true)
+			break
 		}
-		realtorCrawler.BaseSel.StopSessionBrowser(true)
-		break
+	}
+	if err = redis.SetRedis(crawlerSearchRes.TaskID, crawlerSearchRes, time.Hour*1); err != nil {
+		rp.Logger.Fatal(err.Error())
 	}
 }

@@ -64,7 +64,7 @@ func NewRealtorCrawler(
 
 // NewBrowser to start new selenium
 func (rc *RealtorCrawler) NewBrowser() error {
-	if err := rc.BaseSel.StartSelenium("realtor", rc.Proxy, viper.GetBool("crawler.realtor_crawler.proxy_status")); err != nil {
+	if err := rc.BaseSel.StartSelenium("realtor", rc.Proxy, viper.GetBool("crawler.realtor_crawler.proxy_status"), []string{"stealthfox"}); err != nil {
 		return err
 	}
 	// Disable image loading
@@ -167,14 +167,15 @@ func (rc *RealtorCrawler) IsVerifyHuman(pageSource string) bool {
 	return false
 }
 
-func (rc *RealtorCrawler) CrawlSearchData(search string) (string, error) {
-	// NOTE: We only take browser cookies when getting block from realtor website
-	//cookies, err := rc.BaseSel.GetHttpCookies()
-	//if err != nil {
-	//	rc.Logger.Error(err.Error())
-	//	return
-	//}
+func (rc *RealtorCrawler) CrawlSearchData(crawlerSearchRes *schemas.CrawlerSearchRes) (string, error) {
 	data := &schemas.RealtorSearchPageRes{}
+	search := fmt.Sprintf(
+		"%s %s %s %s",
+		crawlerSearchRes.Search.Address,
+		crawlerSearchRes.Search.City,
+		crawlerSearchRes.Search.State,
+		crawlerSearchRes.Search.Zipcode,
+	)
 	rc.CrawlerSchemas.SearchReq = &schemas.RealtorSearchPageReq{
 		Input:     search,
 		ClientID:  "rdc-home",
@@ -215,17 +216,25 @@ func (rc *RealtorCrawler) CrawlSearchData(search string) (string, error) {
 		return "", err
 	}
 	for _, result := range data.Autocomplete {
-		if result.FullAddress[0] == search {
+		if result.Line == crawlerSearchRes.Search.Address &&
+			result.City == crawlerSearchRes.Search.City &&
+			result.StateCode == crawlerSearchRes.Search.State &&
+			result.PostalCode == crawlerSearchRes.Search.Zipcode {
 			return result.MprID, nil
 		}
 	}
-	return "", nil
+	return "", fmt.Errorf("not found data from address requested")
 }
 
 func (rc *RealtorCrawler) ParseData(source string) error {
 	var err error
 	if rc.Doc, err = htmlquery.Parse(strings.NewReader(source)); err != nil {
 		return err
+	}
+	// Need to sure the data is existing
+	sectionSummary := htmlquery.FindOne(rc.Doc, "//div[@id=\"section_summary\"]")
+	if sectionSummary == nil {
+		return fmt.Errorf("not found data from address requested")
 	}
 
 	if err := rc.ClickElements(); err != nil {
@@ -273,13 +282,8 @@ func (rc *RealtorCrawler) ParseData(source string) error {
 
 func (rc *RealtorCrawler) ClickElements() error {
 
-	if err := rc.ClickPaymentCalculator(); err != nil {
-		return err
-	}
-
-	if err := rc.ClickPropertyHistory(); err != nil {
-		return err
-	}
+	rc.ClickPaymentCalculator()
+	rc.ClickPropertyHistory()
 
 	pageSource, err := rc.BaseSel.WebDriver.PageSource()
 
@@ -290,48 +294,46 @@ func (rc *RealtorCrawler) ClickElements() error {
 	return nil
 }
 
-func (rc *RealtorCrawler) ClickPaymentCalculator() error {
+func (rc *RealtorCrawler) ClickPaymentCalculator() {
 	paymentCalculator, err := rc.BaseSel.WebDriver.FindElement(selenium.ByXPATH, "//section[@id=\"payment_calculator\"]")
 
 	if err != nil {
 		rc.Logger.Warn("Click Payment Calculator: Not found section payment_calculator")
-		return err
+		return
 	}
 
 	if err := paymentCalculator.Click(); err != nil {
 		rc.Logger.Warn("Click Payment Calculator: Can not click payment_calculator")
-		return err
+		return
 	}
 	_, err = rc.BaseSel.WebDriver.ExecuteScript("document.getElementById(\"payment_calculator\").scrollIntoView();", nil)
 
 	if err != nil {
 		rc.Logger.Warn("Click Payment Calculator: Error on scoll to payment_calculator")
-		return err
+		return
 	}
 	time.Sleep(2 * time.Second)
-	return nil
 }
 
-func (rc *RealtorCrawler) ClickPropertyHistory() error {
+func (rc *RealtorCrawler) ClickPropertyHistory() {
 	propertyHistory, err := rc.BaseSel.WebDriver.FindElement(selenium.ByXPATH, "//section[@id=\"section_property_history\"]")
 
 	if err != nil {
 		rc.Logger.Warn("Click Property History: Not found section_property_history")
-		return err
+		return
 	}
 
 	if err := propertyHistory.Click(); err != nil {
 		rc.Logger.Warn("Click Property History: Can not click section_property_history")
-		return err
+		return
 	}
 	_, err = rc.BaseSel.WebDriver.ExecuteScript("document.getElementById(\"section_property_history\").scrollIntoView();", nil)
 
 	if err != nil {
 		rc.Logger.Warn("Click Property History: Error on scoll to section_property_history")
-		return err
+		return
 	}
 	time.Sleep(2 * time.Second)
-	return nil
 }
 
 // ParseBed for crawling Bed data

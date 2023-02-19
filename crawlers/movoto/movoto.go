@@ -14,6 +14,7 @@ import (
 	"multilogin_scraping/app/schemas"
 	"multilogin_scraping/crawlers"
 	util2 "multilogin_scraping/pkg/utils"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -34,7 +35,7 @@ type CrawlerSchemas struct {
 	SearchReq  *schemas.MovotoSearchPageReq
 }
 
-const searchURL = "https://parser-external.geo.moveaws.com/suggest?%s"
+const searchURL = "https://www.movoto.com/api/v/search/?%s"
 
 func NewMovotoCrawler(
 	db *gorm.DB,
@@ -45,7 +46,20 @@ func NewMovotoCrawler(
 	c := colly.NewCollector()
 	userAgent := fake.UserAgent()
 	c.UserAgent = userAgent
-
+	if viper.GetBool("crawler.movoto_crawler.proxy_status") == true {
+		var host string
+		if proxy.Type == "sock5" {
+			host = "sock5"
+		} else if proxy.Type == "HTTPS" {
+			host = "https"
+		} else {
+			host = "http"
+		}
+		proxy := fmt.Sprintf("%s://%s:%s@%s:%s", host, proxy.Username, proxy.Password, proxy.Host, proxy.Port)
+		if err := c.SetProxy(proxy); err != nil {
+			logger.Warn(fmt.Sprintf("Can not set proxy on Colly with error: %s", err.Error()))
+		}
+	}
 	return &MovotoCrawler{
 		BaseSel:        BaseSel,
 		CMovoto:        c,
@@ -61,14 +75,14 @@ func NewMovotoCrawler(
 }
 
 // NewBrowser to start new selenium
-func (rc *MovotoCrawler) NewBrowser() error {
-	if err := rc.BaseSel.StartSelenium("movoto", rc.Proxy, viper.GetBool("crawler.movoto_crawler.proxy_status")); err != nil {
+func (mc *MovotoCrawler) NewBrowser() error {
+	if err := mc.BaseSel.StartSelenium("movoto", mc.Proxy, viper.GetBool("crawler.movoto_crawler.proxy_status"), []string{"mimic"}); err != nil {
 		return err
 	}
 	// Disable image loading
 	if viper.GetBool("crawler.disable_load_images") == true {
-		if rc.BaseSel.Profile.BrowserName == "stealthfox" {
-			if err := rc.BaseSel.FireFoxDisableImageLoading(); err != nil {
+		if mc.BaseSel.Profile.BrowserName == "stealthfox" {
+			if err := mc.BaseSel.FireFoxDisableImageLoading(); err != nil {
 				return err
 			}
 		}
@@ -77,8 +91,8 @@ func (rc *MovotoCrawler) NewBrowser() error {
 }
 
 // UserAgentBrowserToColly for coping useragent from browser to colly
-func (rc *MovotoCrawler) UserAgentBrowserToColly() error {
-	userAgent, err := rc.BaseSel.WebDriver.ExecuteScript("return navigator.userAgent", nil)
+func (mc *MovotoCrawler) UserAgentBrowserToColly() error {
+	userAgent, err := mc.BaseSel.WebDriver.ExecuteScript("return navigator.userAgent", nil)
 
 	if err != nil {
 		return err
@@ -88,67 +102,83 @@ func (rc *MovotoCrawler) UserAgentBrowserToColly() error {
 		userAgent = fake.UserAgent()
 	}
 
-	rc.CMovoto.UserAgent = userAgent.(string)
+	mc.CMovoto.UserAgent = userAgent.(string)
 
 	return nil
 }
 
 // RunMovotoCrawlerAPI with a loop to run crawler
-func (rc *MovotoCrawler) RunMovotoCrawlerAPI(mprID string) error {
-	rc.Logger.Info("Zillow Data is crawling...")
-	rc.CrawlerSchemas.MovotoData.URL = fmt.Sprint(viper.GetString("crawler.movoto_crawler.url"), "realestateandhomes-detail/M", mprID)
+func (mc *MovotoCrawler) RunMovotoCrawlerAPI(searchRes *schemas.MovotoSearchDataRes) error {
+	mc.Logger.Info("Movoto Data is crawling...")
+	mc.CrawlerSchemas.MovotoData.PropertyType = searchRes.PropertyType
+	if searchRes.PropertyType != "" {
+		mc.CrawlerSchemas.MovotoData.PropertyStatus = true
+	}
+	mc.CrawlerSchemas.MovotoData.Bath = searchRes.Bath
+	mc.CrawlerSchemas.MovotoData.Bed = searchRes.Bed
+	mc.CrawlerSchemas.MovotoData.LotSizeSF = searchRes.LotSize
+	mc.CrawlerSchemas.MovotoData.HOAFee = searchRes.Hoafee
+	mc.CrawlerSchemas.MovotoData.Pictures = []string{searchRes.TnImgPath}
+	mc.CrawlerSchemas.MovotoData.URL = fmt.Sprint(viper.GetString("crawler.movoto_crawler.url"), searchRes.Path)
+	mc.CrawlerSchemas.MovotoData.Address = fmt.Sprintf(
+		"%s, %s, %s %s",
+		searchRes.Geo.Address,
+		searchRes.Geo.City,
+		searchRes.Geo.State,
+		searchRes.Geo.Zipcode,
+	)
 
 	err := func(address string) error {
-		if err := rc.BaseSel.WebDriver.Get(address); err != nil {
+		if err := mc.BaseSel.WebDriver.Get(address); err != nil {
 			return err
 		}
 		// NOTE: time to load source. Need to increase if data was not showing
 		time.Sleep(viper.GetDuration("crawler.movoto_crawler.time_load_source") * time.Second)
 
-		pageSource, err := rc.BaseSel.WebDriver.PageSource()
+		pageSource, err := mc.BaseSel.WebDriver.PageSource()
 		if err != nil {
-			rc.BrowserTurnOff = true
+			mc.BrowserTurnOff = true
 			return err
 		}
 
-		if err := rc.ByPassVerifyHuman(pageSource, address); err != nil {
+		if err := mc.ByPassVerifyHuman(pageSource, address); err != nil {
 			return err
 		}
 
 		// TODO: Add Parse Data
-		if err := rc.ParseData(pageSource); err != nil {
+		if err := mc.ParseData(pageSource); err != nil {
 			return err
 		}
 
 		return nil
 
-	}(rc.CrawlerSchemas.MovotoData.URL)
+	}(mc.CrawlerSchemas.MovotoData.URL)
 
 	if err != nil {
-		rc.Logger.Error(err.Error())
-		rc.Logger.Error("Failed to crawl data")
+		mc.Logger.Error(err.Error())
+		mc.Logger.Error("Failed to crawl data")
 		return err
 		// TODO: Update error for crawling here
 	}
-	rc.Logger.Info("Completed to crawl data")
+	mc.Logger.Info("Completed to crawl data")
 	return nil
 }
 
 // ByPassVerifyHuman to bypass verify from Movoto website
-func (rc *MovotoCrawler) ByPassVerifyHuman(pageSource string, url string) error {
-	if rc.IsVerifyHuman(pageSource) == true {
-		rc.CrawlerBlocked = true
+func (mc *MovotoCrawler) ByPassVerifyHuman(pageSource string, url string) error {
+	if mc.IsVerifyHuman(pageSource) == true {
+		mc.CrawlerBlocked = true
 
 	}
-	if rc.CrawlerBlocked == true {
+	if mc.CrawlerBlocked == true {
 		for i := 0; i < 3; i++ {
-			err := rc.BaseSel.WebDriver.Get(url)
+			err := mc.BaseSel.WebDriver.Get(url)
 			if err != nil {
 				return err
 			}
-			pageSource, _ = rc.BaseSel.WebDriver.PageSource()
-			if rc.IsVerifyHuman(pageSource) == false {
-				rc.CrawlerBlocked = false
+			pageSource, _ = mc.BaseSel.WebDriver.PageSource()
+			if mc.IsVerifyHuman(pageSource) == false {
+				mc.CrawlerBlocked = false
 				return nil
 			}
 		}
@@ -158,598 +188,301 @@ func (rc *MovotoCrawler) ByPassVerifyHuman(pageSource string, url string) error 
 }
 
 // IsVerifyHuman to check website is blocking
-func (rc *MovotoCrawler) IsVerifyHuman(pageSource string) bool {
+func (mc *MovotoCrawler) IsVerifyHuman(pageSource string) bool {
 	if strings.Contains(pageSource, "Please verify you're a human to continue") || strings.Contains(pageSource, "Let's confirm you are human") {
 		return true
 	}
 	return false
 }
 
-func (rc *MovotoCrawler) CrawlSearchData(search string) (string, error) {
-	// NOTE: We only take browser cookies when getting block from movoto website
-	//cookies, err := rc.BaseSel.GetHttpCookies()
-	//if err != nil {
-	//	rc.Logger.Error(err.Error())
-	//	return
-	//}
-	data := &schemas.MovotoSearchPageRes{}
-	rc.CrawlerSchemas.SearchReq = &schemas.MovotoSearchPageReq{
-		Input:     search,
-		ClientID:  "rdc-home",
-		Limit:     10,
-		AreaTypes: "address",
+func (mc *MovotoCrawler) CrawlSearchData(crawlerSearchRes *schemas.CrawlerSearchRes) (*schemas.MovotoSearchDataRes, error) {
+	searchRes := &schemas.MovotoSearchPageRes{}
+	movotoSearchData := &schemas.MovotoSearchDataRes{}
+	path := fmt.Sprintf(
+		"address %s %s %s %s",
+		crawlerSearchRes.Search.Address,
+		crawlerSearchRes.Search.City,
+		crawlerSearchRes.Search.State,
+		crawlerSearchRes.Search.Zipcode,
+	)
+	mc.CrawlerSchemas.SearchReq = &schemas.MovotoSearchPageReq{
+		Path:              path,
+		Trigger:           "mvtHeader",
+		IncludeAllAddress: true,
+		NewGeoSearch:      true,
 	}
-	searchPageQuery, err := query.Values(rc.CrawlerSchemas.SearchReq)
+	searchPageQuery, err := query.Values(mc.CrawlerSchemas.SearchReq)
 	if err != nil {
-		return "nil", err
+		return movotoSearchData, err
 	}
-
-	rc.CMovoto.OnError(func(r *colly.Response, err error) {
-		rc.Logger.Error(fmt.Sprint("HTTP Status code:", r.StatusCode, "|URL:", r.Request.URL, "|Errors:", err))
-		return
-	})
-
-	rc.CMovoto.OnRequest(func(r *colly.Request) {
-		r.Headers.Set("Content-Type", "application/json")
-	})
-
-	rc.CMovoto.OnResponse(func(r *colly.Response) {
-		if err := json.Unmarshal(r.Body, data); err != nil {
-			rc.Logger.Error(err.Error())
-			return
-		}
-	})
 
 	urlRun := fmt.Sprintf(searchURL, searchPageQuery.Encode())
-
-	// NOTE: We only take browser cookies when getting block from movoto website
-	//err = zc.CZillow.SetCookies(urlRun, cookies)
-	//if err != nil {
-	//	zc.SearchDataByCollyStatus = false
-	//	zc.ShowLogError(err.Error())
-	//	return
-	//}
-	if err := rc.CMovoto.Visit(urlRun); err != nil {
-		return "", err
+	if err := mc.BaseSel.WebDriver.Get(urlRun); err != nil {
+		return movotoSearchData, err
 	}
-	for _, result := range data.Autocomplete {
-		if result.FullAddress[0] == search {
-			return result.MprID, nil
+
+	time.Sleep(time.Second * 2)
+	pageSource, err := mc.BaseSel.WebDriver.PageSource()
+	if err != nil {
+		return movotoSearchData, err
+	}
+
+	if err := mc.ByPassVerifyHuman(pageSource, urlRun); err != nil {
+		return movotoSearchData, err
+	}
+	doc, err := htmlquery.Parse(strings.NewReader(pageSource))
+	if err != nil {
+		return movotoSearchData, err
+	}
+	el := htmlquery.FindOne(doc, "//pre")
+
+	jsonText := htmlquery.InnerText(el)
+	if err := json.Unmarshal([]byte(jsonText), searchRes); err != nil {
+		return movotoSearchData, err
+	}
+
+	if searchRes.Data.Listings == nil {
+		return movotoSearchData, fmt.Errorf("not found data from address requested")
+	}
+
+	for _, v := range searchRes.Data.Listings {
+		if v.Geo.Address == crawlerSearchRes.Search.Address &&
+			v.Geo.City == crawlerSearchRes.Search.City &&
+			v.Geo.State == crawlerSearchRes.Search.State &&
+			v.Geo.Zipcode == crawlerSearchRes.Search.Zipcode {
+			return &v, nil
 		}
 	}
-	return "", nil
+
+	return movotoSearchData, fmt.Errorf("not found data from address requested")
 }
 
-func (rc *MovotoCrawler) ParseData(source string) error {
+func (mc *MovotoCrawler) ParseData(source string) error {
 	var err error
-	if rc.Doc, err = htmlquery.Parse(strings.NewReader(source)); err != nil {
+	if mc.Doc, err = htmlquery.Parse(strings.NewReader(source)); err != nil {
 		return err
 	}
+	movotoJsonRes := mc.ParseJsonData()
 
-	//if err := rc.ClickElements(); err != nil {
-	//	return err
-	//}
+	if movotoJsonRes.PageData.Features != nil {
+		for _, feature := range movotoJsonRes.PageData.Features {
+			// Interior value
+			if feature.Name == "Interior" {
+				for _, interior := range feature.Value {
+					if interior.Name == "Bathrooms" {
+						mc.CrawlerSchemas.MovotoData.FullBathrooms, err = strconv.ParseFloat(interior.Value[0].Value, 64)
+						if err != nil {
+							mc.Logger.Warn(fmt.Sprintf("Parse Full Bathrooms:%s", err.Error()))
+						}
 
-	rc.ParseBed()
-	rc.ParseBath()
-	rc.ParsePropertyStatus()
-	rc.ParseFullBathrooms()
-	rc.ParseSF()
-	rc.ParseSalePrice()
-	rc.ParseEstPayment()
-	rc.ParsePrincipalInterest()
-	rc.ParseMortgageInsurance()
-	rc.ParsePropertyTaxes()
-	rc.ParseHomeInsurance()
-	rc.ParseHOAFees()
-	rc.ParseOverview()
-	rc.ParseSource()
-	rc.ParsePropertyType()
-	rc.ParseYearBuilt()
-	rc.ParseNaturalGas()
-	rc.ParseCentralAir()
-	rc.ParseGarageSpaces()
-	rc.ParseLotSize()
-	rc.ParseLotSizeAcres()
-	rc.ParseInteriorFeatures()
-	rc.ParsePrimaryBedroomLevel()
-	rc.ParseFlooringType()
-	rc.ParseHeatingType()
-	rc.ParseTotalParkingSpaces()
-	rc.ParseLotFeatures()
-	rc.ParseProperySubType()
-	rc.ParseConstructionMaterials()
-	rc.ParseFoundation()
-	rc.ParseSubdivision()
-	rc.ParseElementarySchool()
-	rc.ParseMiddleSchool()
-	rc.ParseHighSchool()
-	rc.ParseDataSource()
-	rc.ParsePictures()
+						if mc.CrawlerSchemas.MovotoData.FullBathrooms != 0 {
+							mc.CrawlerSchemas.MovotoData.HalfBathrooms = mc.CrawlerSchemas.MovotoData.FullBathrooms / 2
+						}
+
+					}
+				}
+			}
+			// Exterior value
+			if feature.Name == "Exterior" {
+				for _, exterior := range feature.Value {
+					if exterior.Name == "Parking" {
+						for _, parking := range exterior.Value {
+							if parking.Name == "# Covered Spaces" {
+								mc.CrawlerSchemas.MovotoData.TotalParkingSpaces = parking.Value
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	mc.CrawlerSchemas.MovotoData.SF = float64(movotoJsonRes.PageData.SqftTotal)
+	mc.CrawlerSchemas.MovotoData.SalesPrice = float64(movotoJsonRes.PageData.ListPrice)
+
+	var pictures []string
+	if len(movotoJsonRes.PageData.CategorizedPhotos) > 0 {
+		for _, pic := range movotoJsonRes.PageData.CategorizedPhotos {
+			if len(pic.Photos) > 0 {
+				for _, photo := range pic.Photos {
+					pictures = append(pictures, photo.URL)
+				}
+			}
+		}
+	}
+	mc.CrawlerSchemas.MovotoData.Pictures = pictures
+	mc.CrawlerSchemas.MovotoData.Overview = movotoJsonRes.PageData.Description
+	//mc.ParseFullBathrooms()
+	//mc.ParseSF()
+	//mc.ParseSalePrice()
+	mc.ParseEstPayment()
+	mc.ParsePrincipalInterest()
+	mc.ParseMortgageInsurance()
+	mc.ParsePropertyTaxes()
+	mc.ParseHomeInsurance()
+	mc.ParseEstimatedSalesRange()
+	mc.ParseMLS()
+	mc.ParseYearBuilt()
+	mc.ParseLotSizeAcres()
+	mc.ParseAppliances()
+	mc.ParsePropertySubtype()
+	mc.ParseFoundation()
+	mc.ParseNewConstruction()
 	return nil
 }
 
-//func (rc *MovotoCrawler) ClickElements() error {
-//	//
-//	//if err := rc.ClickPaymentCalculator(); err != nil {
-//	//	return err
-//	//}
-//	//
-//	//if err := rc.ClickPropertyHistory(); err != nil {
-//	//	return err
-//	//}
-//	//
-//	//pageSource, err := rc.BaseSel.WebDriver.PageSource()
-//	//
-//	//if rc.Doc, err = htmlquery.Parse(strings.NewReader(pageSource)); err != nil {
-//	//	rc.Logger.Warn("Parse Principal Interest: Can not load page source")
-//	//	return err
-//	//}
-//	//return nil
-//}
-//
-//func (rc *MovotoCrawler) ClickPaymentCalculator() error {
-//	//paymentCalculator, err := rc.BaseSel.WebDriver.FindElement(selenium.ByXPATH, "//section[@id=\"payment_calculator\"]")
-//	//
-//	//if err != nil {
-//	//	rc.Logger.Warn("Click Payment Calculator: Not found section payment_calculator")
-//	//	return err
-//	//}
-//	//
-//	//if err := paymentCalculator.Click(); err != nil {
-//	//	rc.Logger.Warn("Click Payment Calculator: Can not click payment_calculator")
-//	//	return err
-//	//}
-//	//_, err = rc.BaseSel.WebDriver.ExecuteScript("document.getElementById(\"payment_calculator\").scrollIntoView();", nil)
-//	//
-//	//if err != nil {
-//	//	rc.Logger.Warn("Click Payment Calculator: Error on scoll to payment_calculator")
-//	//	return err
-//	//}
-//	//time.Sleep(2 * time.Second)
-//	//return nil
-//}
-//
-//func (rc *MovotoCrawler) ClickPropertyHistory() error {
-//	//propertyHistory, err := rc.BaseSel.WebDriver.FindElement(selenium.ByXPATH, "//section[@id=\"section_property_history\"]")
-//	//
-//	//if err != nil {
-//	//	rc.Logger.Warn("Click Property History: Not found section_property_history")
-//	//	return err
-//	//}
-//	//
-//	//if err := propertyHistory.Click(); err != nil {
-//	//	rc.Logger.Warn("Click Property History: Can not click section_property_history")
-//	//	return err
-//	//}
-//	//_, err = rc.BaseSel.WebDriver.ExecuteScript("document.getElementById(\"section_property_history\").scrollIntoView();", nil)
-//	//
-//	//if err != nil {
-//	//	rc.Logger.Warn("Click Property History: Error on scoll to section_property_history")
-//	//	return err
-//	//}
-//	//time.Sleep(2 * time.Second)
-//	//return nil
-//}
+func (mc *MovotoCrawler) ParseJsonData() *schemas.MovotoJsonRes {
+	var movotoJsonRes *schemas.MovotoJsonRes
+	jsDoc := htmlquery.FindOne(mc.Doc, "//script[contains(text(), \"__INITIAL_STATE__ \")]")
+	jsText := htmlquery.InnerText(jsDoc)
+	// Remove Javascript code
+	if jsText != "" {
+		jsText = strings.Split(jsText, "__INITIAL_STATE__ = ")[1]
+		jsText = strings.Split(jsText, ";\n\t\t\t\twindow.startTime")[0]
+	}
 
-// ParseBed for crawling Bed data
-func (rc *MovotoCrawler) ParseBed() {
-	//bedDoc := htmlquery.FindOne(
-	//	rc.Doc,
-	//	"//li[contains(@data-testid,\"property-meta-beds\")]/span/text()",
-	//)
-	//if bedDoc == nil {
-	//	rc.Logger.Warn("Parse Bed: Not found element.")
-	//	return
-	//}
-	//bedText := htmlquery.InnerText(bedDoc)
-	//if bedInt, err := strconv.Atoi(bedText); err != nil {
-	//	rc.Logger.Error(fmt.Sprintf("Parse Bed: %v", err.Error()))
-	//} else {
-	//	rc.CrawlerSchemas.MovotoData.Bed = bedInt
-	//}
-}
+	// Convert string to json
+	if err := json.Unmarshal([]byte(jsText), &movotoJsonRes); err != nil {
+		mc.Logger.Warn(fmt.Sprintf("\"Parse Json Data: Got errors %s\"", err.Error()))
+	}
 
-// ParseBath for crawling Bath data
-func (rc *MovotoCrawler) ParseBath() {
-	//bathDoc := htmlquery.FindOne(
-	//	rc.Doc,
-	//	"//li[contains(@data-testid,\"property-meta-baths\")]/span/text()",
-	//)
-	//if bathDoc == nil {
-	//	rc.Logger.Warn("Parse Bath: Not found element.")
-	//	return
-	//}
-	//bathText := htmlquery.InnerText(bathDoc)
-	//if bathInt, err := strconv.Atoi(bathText); err != nil {
-	//	rc.Logger.Error(fmt.Sprintf("Parse Bath: %v", err.Error()))
-	//} else {
-	//	rc.CrawlerSchemas.MovotoData.Bath = bathInt
-	//}
-}
-
-// ParsePropertyStatus for checking Property Status
-func (rc *MovotoCrawler) ParsePropertyStatus() {
-	//if rc.CrawlerSchemas.MovotoData.Bed > 0 || rc.CrawlerSchemas.MovotoData.Bath > 0 {
-	//	rc.CrawlerSchemas.MovotoData.PropertyStatus = true
-	//}
-}
-
-// ParseFullBathrooms for crawling full bathrooms
-func (rc *MovotoCrawler) ParseFullBathrooms() {
-	//fullBathroomsDoc := htmlquery.FindOne(rc.Doc, "//li[contains(text(), \"Full Bathrooms\")]/text()")
-	//if fullBathroomsDoc == nil {
-	//	rc.Logger.Warn("Parse full bathrooms: Not found element.")
-	//	return
-	//}
-	//fullBathroomsText := htmlquery.InnerText(fullBathroomsDoc)
-	//fullBathroomsSlice := strings.Split(fullBathroomsText, ":")
-	//fullBathroomsText = fullBathroomsSlice[1]
-	//
-	//fullBathroomsFloat, err := util2.ConvertToFloat(fullBathroomsText)
-	//if err != nil {
-	//	rc.Logger.Error(fmt.Sprintf("Parse full bathrooms: %v", err.Error()))
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.FullBathrooms = fullBathroomsFloat
-}
-
-// ParseSF for parsing SF
-func (rc *MovotoCrawler) ParseSF() {
-	//sfDoc := htmlquery.FindOne(rc.Doc, "//li[contains(@data-testid,\"property-meta-sqft\")]//span[@class=\"meta-value\"]/text()")
-	//if sfDoc == nil {
-	//	rc.Logger.Warn("Parse SF: Not found element.")
-	//	return
-	//}
-	//sfFloat, err := util2.ConvertToFloat(htmlquery.InnerText(sfDoc))
-	//
-	//if err != nil {
-	//	rc.Logger.Error(fmt.Sprintf("Parse SF: %v", err.Error()))
-	//	return
-	//}
-	//
-	//rc.CrawlerSchemas.MovotoData.SF = sfFloat
-}
-
-// ParseSalePrice for parsing Sale Price
-func (rc *MovotoCrawler) ParseSalePrice() {
-	//salePriceDoc := htmlquery.FindOne(rc.Doc, "//div[@data-testid=\"list-price\"]//text()")
-	//if salePriceDoc == nil {
-	//	rc.Logger.Warn("Parse Sale Price: Not found element.")
-	//	return
-	//}
-	//
-	//salePriceFloat, err := util2.ConvertToFloat(htmlquery.InnerText(salePriceDoc))
-	//
-	//if err != nil {
-	//	rc.Logger.Warn(fmt.Sprintf("Parse Sale Price: %v", err.Error()))
-	//	return
-	//}
-	//
-	//rc.CrawlerSchemas.MovotoData.SalesPrice = salePriceFloat
+	return movotoJsonRes
 }
 
 // ParseEstPayment for parsing Estimate Payment
-func (rc *MovotoCrawler) ParseEstPayment() {
-	//estPaymentDoc := htmlquery.FindOne(rc.Doc, "//*[@data-testid=\"est-payment\"]//*[contains(text(), \"$\")]")
-	//if estPaymentDoc == nil {
-	//	rc.Logger.Warn("Parse Est Payment: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.EstPayment = htmlquery.InnerText(estPaymentDoc)
+func (mc *MovotoCrawler) ParseEstPayment() {
+	estPaymentDoc := htmlquery.FindOne(mc.Doc, "//div[@comp=\"propertyTitle\"]//span[contains(text(), \"Estimate\")]/a")
+	if estPaymentDoc == nil {
+		mc.Logger.Warn("Parse Est Payment: Not found element.")
+		return
+	}
+	mc.CrawlerSchemas.MovotoData.EstPayment = htmlquery.InnerText(estPaymentDoc)
 }
 
 // ParsePrincipalInterest for parsing Principal Interest
 // NOTE: This parsing will be loading page source again.
-func (rc *MovotoCrawler) ParsePrincipalInterest() {
-	//principalInterestDoc := htmlquery.FindOne(rc.Doc, "//div[contains(text(), \"Principal & Interest\")]/following-sibling::div")
-	//
-	//if principalInterestDoc == nil {
-	//	rc.Logger.Warn("Parse Principal Interest: Not found element.")
-	//	return
-	//}
-	//
-	//rc.CrawlerSchemas.MovotoData.PrincipalInterest = htmlquery.InnerText(principalInterestDoc)
+func (mc *MovotoCrawler) ParsePrincipalInterest() {
+	principalInterestDoc := htmlquery.FindOne(mc.Doc, "//div[contains(text(), \"Principal & Interest\")]/following-sibling::div/span")
+
+	if principalInterestDoc == nil {
+		mc.Logger.Warn("Parse Principal Interest: Not found element.")
+		return
+	}
+
+	mc.CrawlerSchemas.MovotoData.PrincipalInterest = htmlquery.InnerText(principalInterestDoc)
 }
 
 // ParseMortgageInsurance for parsing Mortgage Insurance
-func (rc *MovotoCrawler) ParseMortgageInsurance() {
-	//mortgageInsuranceDoc := htmlquery.FindOne(rc.Doc, "//div[contains(text(), \"Mortgage Insurance\")]/following-sibling::div")
-	//if mortgageInsuranceDoc == nil {
-	//	rc.Logger.Warn("Parse Mortgage Insurance: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.MortgageInsurance = htmlquery.InnerText(mortgageInsuranceDoc)
+func (mc *MovotoCrawler) ParseMortgageInsurance() {
+	mortgageInsuranceDoc := htmlquery.FindOne(mc.Doc, "//div[@comp=\"propertyTitle\"]//span[contains(text(), \"Mortgage\")]/a")
+	if mortgageInsuranceDoc == nil {
+		mc.Logger.Warn("Parse Mortgage Insurance: Not found element.")
+		return
+	}
+	mc.CrawlerSchemas.MovotoData.MortgageInsurance = htmlquery.InnerText(mortgageInsuranceDoc)
 }
 
 // ParsePropertyTaxes for parsing Property Taxes
-func (rc *MovotoCrawler) ParsePropertyTaxes() {
-	//propertyTaxesDoc := htmlquery.FindOne(rc.Doc, "//div[contains(text(), \"Property tax\")]/following-sibling::div")
-	//if propertyTaxesDoc == nil {
-	//	rc.Logger.Warn("Parse Property Taxes: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.PropertyTaxes = htmlquery.InnerText(propertyTaxesDoc)
+func (mc *MovotoCrawler) ParsePropertyTaxes() {
+	propertyTaxesDoc := htmlquery.FindOne(mc.Doc, "//section[@id=\"propertyMortgagePanel\"]//div[contains(text(), \"Taxes\")]/following-sibling::div/span")
+	if propertyTaxesDoc == nil {
+		mc.Logger.Warn("Parse Property Taxes: Not found element.")
+		return
+	}
+	mc.CrawlerSchemas.MovotoData.PropertyTaxes = htmlquery.InnerText(propertyTaxesDoc)
 }
 
 // ParseHomeInsurance for parsing Home Insurance
-func (rc *MovotoCrawler) ParseHomeInsurance() {
-	//homeInsuranceDoc := htmlquery.FindOne(rc.Doc, "//div[contains(text(), \"Home Insurance\")]/following-sibling::div")
-	//if homeInsuranceDoc == nil {
-	//	rc.Logger.Warn("Parse Home Insurance: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.HomeInsurance = htmlquery.InnerText(homeInsuranceDoc)
+// TODO: Still not found data element and will find later
+func (mc *MovotoCrawler) ParseHomeInsurance() {
+	homeInsuranceDoc := htmlquery.FindOne(mc.Doc, "//section[@id=\"propertyMortgagePanel\"]//a[@data-id=\"homeInsurance\"]/div[2]/span")
+	if homeInsuranceDoc == nil {
+		mc.Logger.Warn("Parse Home Insurance: Not found element.")
+		return
+	}
+	mc.CrawlerSchemas.MovotoData.HomeInsurance = htmlquery.InnerText(homeInsuranceDoc)
 }
 
-// ParseHOAFees for parsing HOA Fees
-func (rc *MovotoCrawler) ParseHOAFees() {
-	//hoaFeesDoc := htmlquery.FindOne(rc.Doc, "//div[contains(text(), \"HOA fees\")]/following-sibling::div")
-	//if hoaFeesDoc == nil {
-	//	rc.Logger.Warn("Parse HOA Fees: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.HOAFee = htmlquery.InnerText(hoaFeesDoc)
+// ParseEstimatedSalesRange for parsing Estimated Sale Range Minimum and Maximum
+func (mc *MovotoCrawler) ParseEstimatedSalesRange() {
+	estSaleRangeDoc := htmlquery.FindOne(mc.Doc, "//div[contains(text(), \"Estimated List Price\")]/following-sibling::div")
+	if estSaleRangeDoc == nil {
+		mc.Logger.Warn("Parse Estimated Sale Range: Not found element.")
+		return
+	}
+	estSaleRangeText := htmlquery.InnerText(estSaleRangeDoc)
+	estSaleRange := strings.Split(estSaleRangeText, "-")
+	if len(estSaleRange) == 2 {
+		mc.CrawlerSchemas.MovotoData.EstimatedSalesRangeMinimum = strings.TrimSpace(estSaleRange[0])
+		mc.CrawlerSchemas.MovotoData.EstimatedSalesRangeMax = strings.TrimSpace(estSaleRange[1])
+	}
 }
 
-// ParseOverview for parsing overview
-func (rc *MovotoCrawler) ParseOverview() {
-	//overviewDoc := htmlquery.FindOne(rc.Doc, "//div[@id=\"section_property_details\"]")
-	//if overviewDoc == nil {
-	//	rc.Logger.Warn("Parse Overview: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.HOAFee = htmlquery.InnerText(overviewDoc)
-}
-
-// ParseSource for parsing source
-func (rc *MovotoCrawler) ParseSource() {
-	//sourceDoc := htmlquery.FindOne(rc.Doc, "(//div[@id=\"content-property_history\"]//table)[1]/tbody//tr[position()=1]/td[last()]")
-	//if sourceDoc == nil {
-	//	rc.Logger.Warn("Parse Source: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.Source = htmlquery.InnerText(sourceDoc)
-}
-
-// ParsePropertyType for parsing Property Type
-func (rc *MovotoCrawler) ParsePropertyType() {
-	//propertyTypeDoc := htmlquery.FindOne(rc.Doc, "//div[@id=\"section_summary\"]//span[contains(text(), \"Property Type\")]/parent::div/following-sibling::div")
-	//if propertyTypeDoc == nil {
-	//	rc.Logger.Warn("Parse Property Type: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.PropertyType = htmlquery.InnerText(propertyTypeDoc)
+// ParseMLS for parsing # MLS
+func (mc *MovotoCrawler) ParseMLS() {
+	mlsDoc := htmlquery.FindOne(mc.Doc, "//section[@id=\"propertyDetailPanel\"]//span[contains(text(), \"MLS #\")]/following-sibling::div")
+	if mlsDoc == nil {
+		mc.Logger.Warn("Parse #MLS: Not found element.")
+		return
+	}
+	mc.CrawlerSchemas.MovotoData.MLS = htmlquery.InnerText(mlsDoc)
 }
 
 // ParseYearBuilt for parsing Year Built
-func (rc *MovotoCrawler) ParseYearBuilt() {
-	//yearBuiltDoc := htmlquery.FindOne(rc.Doc, "//div[@id=\"section_summary\"]//span[contains(text(), \"Year Built\")]/parent::div/following-sibling::div")
-	//if yearBuiltDoc == nil {
-	//	rc.Logger.Warn("Parse Year Built: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.YearBuilt = htmlquery.InnerText(yearBuiltDoc)
-}
-
-// ParseNaturalGas for parsing Natural Gas
-func (rc *MovotoCrawler) ParseNaturalGas() {
-	//naturalGasDoc := htmlquery.FindOne(rc.Doc, "//*[contains(text(), \"Natural Gas\") or contains(text(), \"natural gas\")]")
-	//if naturalGasDoc == nil {
-	//	rc.Logger.Warn("Parse Natural Gas: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.NaturalGas = true
-}
-
-// ParseCentralAir for parsing Central Air
-func (rc *MovotoCrawler) ParseCentralAir() {
-	//centerAirDoc := htmlquery.FindOne(rc.Doc, "//*[contains(text(), \"Central Air\") or contains(text(), \"central air\")]")
-	//if centerAirDoc == nil {
-	//	rc.Logger.Warn("Parse Central Air: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.CentralAir = true
-}
-
-// ParseGarageSpaces for parsing Garage Spaces
-func (rc *MovotoCrawler) ParseGarageSpaces() {
-	//garageSpacesDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Garage Spaces\")]")
-	//if garageSpacesDoc == nil {
-	//	rc.Logger.Warn("Parse Garage Spaces: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.OfGarageSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(garageSpacesDoc), "Garage Spaces:", "", -1))
-}
-
-// ParseLotSize for parsing Lot Size
-func (rc *MovotoCrawler) ParseLotSize() {
-	//lotSizeDoc := htmlquery.FindOne(rc.Doc, "//li[contains(@data-testid,\"property-meta-lot-size\")]//span[@class=\"meta-value\"]/text()")
-	//if lotSizeDoc == nil {
-	//	rc.Logger.Warn("Parse Lot Size: Not found element.")
-	//	return
-	//}
-	//lotSizeFloat, err := util2.ConvertToFloat(htmlquery.InnerText(lotSizeDoc))
-	//
-	//if err != nil {
-	//	rc.Logger.Error(fmt.Sprintf("Parse Lot Size: %v", err.Error()))
-	//	return
-	//}
-	//
-	//rc.CrawlerSchemas.MovotoData.LotSizeSF = lotSizeFloat
+func (mc *MovotoCrawler) ParseYearBuilt() {
+	yearBuiltDoc := htmlquery.FindOne(mc.Doc, "//section[@id=\"propertyDetailPanel\"]//*[contains(text(), \"Year Built\")]/following-sibling::div")
+	if yearBuiltDoc == nil {
+		mc.Logger.Warn("Parse Year Built: Not found element.")
+		return
+	}
+	mc.CrawlerSchemas.MovotoData.YearBuilt = htmlquery.InnerText(yearBuiltDoc)
 }
 
 // ParseLotSizeAcres for parsing Lot Size Acres
-func (rc *MovotoCrawler) ParseLotSizeAcres() {
-	//lotSizeAcresDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Lot Size Acres\")]")
-	//if lotSizeAcresDoc == nil {
-	//	rc.Logger.Warn("Parse Lot Size Acres: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.OfGarageSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(lotSizeAcresDoc), "Lot Size Acres:", "", -1))
+func (mc *MovotoCrawler) ParseLotSizeAcres() {
+	lotSizeAcresDoc := htmlquery.FindOne(mc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Lot Size Acres\")]")
+	if lotSizeAcresDoc == nil {
+		mc.Logger.Warn("Parse Lot Size Acres: Not found element.")
+		return
+	}
+	mc.CrawlerSchemas.MovotoData.LotSizeAcres = strings.TrimSpace(strings.Replace(htmlquery.InnerText(lotSizeAcresDoc), "Lot Size Acres:", "", -1))
 }
 
-// ParseInteriorFeatures for parsing Interior Features
-func (rc *MovotoCrawler) ParseInteriorFeatures() {
-	//var interiorFeaturesList []string
-	//interiorFeaturesDocs := htmlquery.Find(rc.Doc, "//h4[contains(text(), \"Interior Features\")]/following-sibling::ul[1]/li/text()")
-	//if interiorFeaturesDocs == nil {
-	//	rc.Logger.Warn("Parse Interior Features: Not found element.")
-	//	return
-	//}
-	//for _, v := range interiorFeaturesDocs {
-	//	interiorFeaturesList = append(interiorFeaturesList, htmlquery.InnerText(v))
-	//}
-	//rc.CrawlerSchemas.MovotoData.InteriorFeatures = strings.Join(interiorFeaturesList, ", ")
+// ParseAppliances for parsing Appliances
+func (mc *MovotoCrawler) ParseAppliances() {
+	appliancesDoc := htmlquery.FindOne(mc.Doc, "//section[@id=\"propertyDetailPanel\"]//*[contains(text(), \"Appliances\")]/following-sibling::div")
+	if appliancesDoc == nil {
+		mc.Logger.Warn("Parse Appliances: Not found element.")
+		return
+	}
+	mc.CrawlerSchemas.MovotoData.Appliances = htmlquery.InnerText(appliancesDoc)
 }
 
-// ParsePrimaryBedroomLevel for parsing Primary Bedroom Level
-func (rc *MovotoCrawler) ParsePrimaryBedroomLevel() {
-	//primaryBedroomLevelDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Bedrooms\")]")
-	//if primaryBedroomLevelDoc == nil {
-	//	rc.Logger.Warn("Parse Primary Bedroom Level: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.PrimaryBedroomLevel = strings.TrimSpace(strings.Replace(htmlquery.InnerText(primaryBedroomLevelDoc), "Bedrooms:", "", -1))
-}
-
-// ParseFlooringType for parsing Flooring Type
-func (rc *MovotoCrawler) ParseFlooringType() {
-	//flooringTypeDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Flooring:\")]")
-	//if flooringTypeDoc == nil {
-	//	rc.Logger.Warn("Parse Flooring Type: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.FlooringType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(flooringTypeDoc), "Flooring:", "", -1))
-}
-
-// ParseHeatingType for parsing Heating Type
-func (rc *MovotoCrawler) ParseHeatingType() {
-	//heatingTypeDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Heating Features:\")]")
-	//if heatingTypeDoc == nil {
-	//	rc.Logger.Warn("Parse Heating Type: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.HeatingType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(heatingTypeDoc), "Heating Features:", "", -1))
-}
-
-// ParseTotalParkingSpaces for parsing Total Parking Spaces
-func (rc *MovotoCrawler) ParseTotalParkingSpaces() {
-	//totalParkingSpacesDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Parking Total:\")]")
-	//if totalParkingSpacesDoc == nil {
-	//	rc.Logger.Warn("Parse Total Parking Spaces: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.TotalParkingSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(totalParkingSpacesDoc), "Parking Total:", "", -1))
-}
-
-// ParseLotFeatures for parsing Lot Features
-func (rc *MovotoCrawler) ParseLotFeatures() {
-	//var lotFeaturesList []string
-	//lotFeaturesDocs := htmlquery.Find(rc.Doc, "//h4[contains(text(), \"Exterior and Lot Features\")]/following-sibling::ul[1]/li/text()")
-	//if lotFeaturesDocs == nil {
-	//	rc.Logger.Warn("Parse Lot Features: Not found element.")
-	//	return
-	//}
-	//for _, v := range lotFeaturesDocs {
-	//	lotFeaturesList = append(lotFeaturesList, htmlquery.InnerText(v))
-	//}
-	//rc.CrawlerSchemas.MovotoData.LotFeatures = strings.Join(lotFeaturesList, ", ")
-}
-
-// ParseProperySubType for parsing Propery SubType
-func (rc *MovotoCrawler) ParseProperySubType() {
-	//properySubTypeDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Property Subtype:\")]")
-	//if properySubTypeDoc == nil {
-	//	rc.Logger.Warn("Parse Propery SubType: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.ProperySubType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(properySubTypeDoc), "Property Subtype:", "", -1))
-}
-
-// ParseConstructionMaterials for parsing Construction Materials
-func (rc *MovotoCrawler) ParseConstructionMaterials() {
-	//constructionMaterialsDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Construction Materials:\")]")
-	//if constructionMaterialsDoc == nil {
-	//	rc.Logger.Warn("Parse Construction Materials: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.ConstructionMaterials = strings.TrimSpace(strings.Replace(htmlquery.InnerText(constructionMaterialsDoc), "Construction Materials:", "", -1))
+// ParsePropertySubtype for parsing Property Subtype
+func (mc *MovotoCrawler) ParsePropertySubtype() {
+	propertySubTypesDoc := htmlquery.FindOne(mc.Doc, "//section[@id=\"propertyDetailPanel\"]//*[contains(text(), \"SubType\")]/following-sibling::div")
+	if propertySubTypesDoc == nil {
+		mc.Logger.Warn("Parse Property Subtype: Not found element.")
+		return
+	}
+	mc.CrawlerSchemas.MovotoData.ProperySubType = htmlquery.InnerText(propertySubTypesDoc)
 }
 
 // ParseFoundation for parsing Foundation
-func (rc *MovotoCrawler) ParseFoundation() {
-	//foundationDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Foundation Details:\")]")
-	//if foundationDoc == nil {
-	//	rc.Logger.Warn("Parse Foundation: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.Foundation = strings.TrimSpace(strings.Replace(htmlquery.InnerText(foundationDoc), "Foundation Details:", "", -1))
+func (mc *MovotoCrawler) ParseFoundation() {
+	foundationDoc := htmlquery.FindOne(mc.Doc, "//section[@id=\"propertyDetailPanel\"]//*[contains(text(), \"Foundation\")]/following-sibling::div")
+	if foundationDoc == nil {
+		mc.Logger.Warn("Parse Foundation: Not found element.")
+		return
+	}
+	mc.CrawlerSchemas.MovotoData.Foundation = htmlquery.InnerText(foundationDoc)
 }
 
-// ParseSubdivision for parsing Subdivision
-func (rc *MovotoCrawler) ParseSubdivision() {
-	//SubdivisionDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Subdivision:\")]")
-	//if SubdivisionDoc == nil {
-	//	rc.Logger.Warn("Parse Subdivision: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.Subdivision = strings.TrimSpace(strings.Replace(htmlquery.InnerText(SubdivisionDoc), "Subdivision:", "", -1))
-}
-
-// ParseElementarySchool for parsing Elementary School
-func (rc *MovotoCrawler) ParseElementarySchool() {
-	//elementarySchoolDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Elementary School:\")]")
-	//if elementarySchoolDoc == nil {
-	//	rc.Logger.Warn("Parse Elementary School: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.ElementarySchool = strings.TrimSpace(strings.Replace(htmlquery.InnerText(elementarySchoolDoc), "Elementary School:", "", -1))
-}
-
-// ParseMiddleSchool for parsing Middle School
-func (rc *MovotoCrawler) ParseMiddleSchool() {
-	//middleSchoolDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"Middle School:\")]")
-	//if middleSchoolDoc == nil {
-	//	rc.Logger.Warn("Parse Middle School: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.MiddleSchool = strings.TrimSpace(strings.Replace(htmlquery.InnerText(middleSchoolDoc), "Middle School:", "", -1))
-}
-
-// ParseHighSchool for parsing High School
-func (rc *MovotoCrawler) ParseHighSchool() {
-	//highSchoolDoc := htmlquery.FindOne(rc.Doc, "//ul[@class=\"feature-text-list\"]//li[contains(text(), \"High School:\")]")
-	//if highSchoolDoc == nil {
-	//	rc.Logger.Warn("Parse High School: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.HighSchool = strings.TrimSpace(strings.Replace(htmlquery.InnerText(highSchoolDoc), "High School:", "", -1))
-}
-
-// ParseDataSource for parsing Data Source
-func (rc *MovotoCrawler) ParseDataSource() {
-	//dataSourceDoc := htmlquery.FindOne(rc.Doc, "//div[contains(text(), \"Data Source:\")]/following-sibling::div")
-	//if dataSourceDoc == nil {
-	//	rc.Logger.Warn("Parse Data Source: Not found element.")
-	//	return
-	//}
-	//rc.CrawlerSchemas.MovotoData.YearBuilt = htmlquery.InnerText(dataSourceDoc)
-}
-
-// ParsePictures for parsing pictures
-func (rc *MovotoCrawler) ParsePictures() {
-	//pictures := htmlquery.Find(rc.Doc, "//*[@class=\"main-carousel\"]//picture/img")
-	//
-	//if pictures == nil {
-	//	rc.Logger.Warn("Parse Picture: Not found element.")
-	//	return
-	//}
-	//
-	//var picSlice []string
-	//for _, pic := range pictures {
-	//	picSlice = append(picSlice, htmlquery.SelectAttr(pic, "src"))
-	//}
-	//rc.CrawlerSchemas.MovotoData.Pictures = picSlice
-
+// ParseNewConstruction for parsing New Construction
+func (mc *MovotoCrawler) ParseNewConstruction() {
+	newConstructionDoc := htmlquery.FindOne(mc.Doc, "//section[@id=\"propertyDetailPanel\"]//*[contains(text(), \"Construction\")]/following-sibling::div")
+	if newConstructionDoc == nil {
+		mc.Logger.Warn("Parse New Construction: Not found element.")
+		return
+	}
+	mc.CrawlerSchemas.MovotoData.NewConstruction = htmlquery.InnerText(newConstructionDoc)
 }

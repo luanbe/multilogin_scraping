@@ -39,6 +39,7 @@ type ZillowCrawler struct {
 	BrowserTurnOff          bool
 	Maindb3List             []*entity.ZillowMaindb3Address
 	SearchDataByCollyStatus bool
+	Proxy                   *util2.Proxy
 }
 
 type CrawlerTables struct {
@@ -48,7 +49,7 @@ type CrawlerTables struct {
 	ZillowPriceHistory     []*entity.ZillowPriceHistory
 	ZillowPublicTaxHistory []*entity.ZillowPublicTaxHistory
 	MapBounds              *schemas.MapBounds
-	//ZillowDetail *entry.ZillowDetail
+	//Zillow *entry.Zillow
 }
 
 type CrawlerServices struct {
@@ -64,29 +65,11 @@ func NewZillowCrawler(
 	logger *zap.Logger,
 	onlyHistoryTable bool,
 	proxy *util2.Proxy,
-) (*ZillowCrawler, error) {
+) *ZillowCrawler {
 	BaseSel := crawlers.NewBaseSelenium(logger)
-	if err := BaseSel.StartSelenium("zillow", proxy, viper.GetBool("crawler.zillow_crawler.proxy_status")); err != nil {
-		return nil, err
-	}
-
-	// Disable image loading
-	if viper.GetBool("crawler.disable_load_images") == true {
-		if BaseSel.Profile.BrowserName == "stealthfox" {
-			if err := BaseSel.FireFoxDisableImageLoading(); err != nil {
-				return nil, err
-			}
-		}
-	}
-	userAgent, err := BaseSel.WebDriver.ExecuteScript("return navigator.userAgent", nil)
-	if err != nil {
-		return nil, err
-	}
-	if userAgent == nil {
-		userAgent = fake.UserAgent()
-	}
 	c := colly.NewCollector()
-	c.UserAgent = userAgent.(string)
+	userAgent := fake.UserAgent()
+	c.UserAgent = userAgent
 
 	return &ZillowCrawler{
 		WebDriver: BaseSel.WebDriver,
@@ -107,7 +90,24 @@ func NewZillowCrawler(
 		CrawlerBlocked:   false,
 		BrowserTurnOff:   false,
 		Maindb3List:      maindb3List,
-	}, nil
+		Proxy:            proxy,
+	}
+}
+
+// NewBrowser to start new selenium
+func (zc *ZillowCrawler) NewBrowser() error {
+	if err := zc.BaseSel.StartSelenium("zillow", zc.Proxy, viper.GetBool("crawler.realtor_crawler.proxy_status"), []string{"stealthfox"}); err != nil {
+		return err
+	}
+	// Disable image loading
+	if viper.GetBool("crawler.disable_load_images") == true {
+		if zc.BaseSel.Profile.BrowserName == "stealthfox" {
+			if err := zc.BaseSel.FireFoxDisableImageLoading(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (zc *ZillowCrawler) GetURLCrawling() string {
@@ -166,30 +166,51 @@ func (zc *ZillowCrawler) RunZillowCrawler() error {
 	}
 }
 
-func (zc *ZillowCrawler) RunZillowCrawlerAPI(address string) error {
-	for {
-		err := func() error {
-			zc.ShowLogInfo("Zillow Data is crawling...")
-			zc.CrawlerTables.ZillowData.URL = viper.GetString("crawler.zillow_crawler.url")
-			if err := zc.CrawlAddressAPI(zc.CrawlerTables.ZillowData.URL); err != nil {
-				zc.ShowLogError(err.Error())
-				zc.ShowLogError("Failed to crawl data")
-				if zc.CrawlerBlocked == true {
-					return err
-				}
-				// TODO: Update error for crawling data here
-				//if err = zc.CrawlerServices.Maindb3Service.UpdateStatus(zc.CrawlerSchemas.Maindb3, viper.GetString("crawler.crawler_status.failed")); err != nil {
-				//	return err
-				//}
-			}
-			zc.ShowLogInfo("Completed to crawl data")
-			return nil
-		}()
-		if err != nil {
+func (zc *ZillowCrawler) RunZillowCrawlerAPI(crawlerSearchRes *schemas.CrawlerSearchRes) error {
+	zc.ShowLogInfo("Zillow Data is crawling...")
+	zillowRootURL := viper.GetString("crawler.zillow_crawler.url")
+	zc.CrawlerTables.ZillowData.URL = fmt.Sprintf(
+		"%s%s-%s-%s-%s",
+		zillowRootURL,
+		strings.Replace(crawlerSearchRes.Search.Address, " ", "-", -1),
+		strings.Replace(crawlerSearchRes.Search.City, " ", "-", -1),
+		crawlerSearchRes.Search.State,
+		crawlerSearchRes.Search.Zipcode,
+	)
+
+	err := func() error {
+		if err := zc.BaseSel.WebDriver.Get(zc.CrawlerTables.ZillowData.URL); err != nil {
 			return err
 		}
+		// NOTE: time to load source. Need to increase if data was not showing
+		time.Sleep(viper.GetDuration("crawler.zillow_crawler.time_load_source") * time.Second)
+
+		pageSource, err := zc.BaseSel.WebDriver.PageSource()
+		if err != nil {
+			zc.BrowserTurnOff = true
+			return err
+		}
+
+		if err := zc.ByPassVerifyHuman(pageSource, zc.CrawlerTables.ZillowData.URL); err != nil {
+			return err
+		}
+
+		// TODO: Add Parse Data
+		if err := zc.ParseData(pageSource); err != nil {
+			return err
+		}
+
 		return nil
+
+	}()
+	if err != nil {
+		zc.Logger.Error(err.Error())
+		zc.Logger.Error("Failed to crawl data")
+		return err
+		// TODO: Update error for crawling here
 	}
+	zc.Logger.Info("Completed to crawl data")
+	return nil
 }
 
 func (zc *ZillowCrawler) ByPassVerifyHuman(pageSource string, url string) error {
@@ -512,7 +533,26 @@ func (zc *ZillowCrawler) CrawlAddress(address string) error {
 		return err
 	}
 	// NOTE: time to load source. Need to increase if data was not showing
-	time.Sleep(viper.GetDuration("crawler.zillow_crawler.time_load_source") * time.Second)
+	//time.Sleep(viper.GetDuration("crawler.zillow_crawler.time_load_source") * time.Second)
+
+	if err := zc.WebDriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		viewContainer, err := wd.FindElement(selenium.ByXPATH, "//div[@class=\"data-view-container\"]")
+
+		if err != nil {
+			return false, err
+		}
+
+		display, err := viewContainer.IsDisplayed()
+
+		if err != nil {
+			return false, err
+		}
+
+		return display, nil
+	}, 1000, 1000); err != nil {
+		return err
+	}
+
 	pageSource, err := zc.WebDriver.PageSource()
 	if err != nil {
 		zc.BrowserTurnOff = true
@@ -572,8 +612,20 @@ func (zc *ZillowCrawler) CrawlAddressAPI(address string) error {
 	if err := zc.WebDriver.Get(address); err != nil {
 		return err
 	}
-	// NOTE: time to load source. Need to increase if data was not showing
+	//// NOTE: time to load source. Need to increase if data was not showing
+	//timeLoad := viper.GetDuration("crawler.zillow_crawler.time_load_source") * time.Second
+	//if err := zc.WebDriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+	//	viewContainer, _ := wd.FindElement(selenium.ByXPATH, "//div[@class=\"data-view-container\"]//*[contains(text(), \"Lot size\")]")
+	//	if viewContainer != nil {
+	//		display, _ := viewContainer.IsDisplayed()
+	//		return display, nil
+	//	}
+	//	return false, nil
+	//}, timeLoad, timeLoad); err != nil {
+	//	return err
+	//}
 	time.Sleep(viper.GetDuration("crawler.zillow_crawler.time_load_source") * time.Second)
+
 	pageSource, err := zc.WebDriver.PageSource()
 	if err != nil {
 		zc.BrowserTurnOff = true
@@ -629,6 +681,11 @@ func (zc *ZillowCrawler) ParseData(source string) error {
 	//htmlquery.DisableSelectorCache = true
 	doc, err := htmlquery.Parse(strings.NewReader(source))
 
+	// Need to sure the data is existing
+	detailPageContainer := htmlquery.FindOne(doc, "//div[@id=\"details-page-container\"]")
+	if detailPageContainer == nil {
+		return fmt.Errorf("not found data from address requested")
+	}
 	if err != nil {
 		return err
 	}
@@ -1084,16 +1141,15 @@ func (zc *ZillowCrawler) ParseHoaAmount(doc *html.Node) {
 }
 
 func (zc *ZillowCrawler) ParseLotSizes(doc *html.Node) {
-	lotSizes := htmlquery.Find(doc, "//*[contains(text(), \"Lot size\")]/text()")
-	if lotSizes != nil {
-		for _, v := range lotSizes {
-			lotSizeData := strings.TrimSpace(strings.Replace(v.Data, "Lot size:", "", -1))
-			if strings.Contains(lotSizeData, "sqft") == true {
-				zc.CrawlerTables.ZillowData.LotSizeSF = lotSizeData
-			}
-			if strings.Contains(lotSizeData, "Acres") == true {
-				zc.CrawlerTables.ZillowData.LotSizeAcres = lotSizeData
-			}
+	lotSizesDoc := htmlquery.FindOne(doc, "//div[@class=\"data-view-container\"]//*[contains(text(), \"Lot size\")]")
+	if lotSizesDoc != nil {
+		lotSizesText := htmlquery.InnerText(lotSizesDoc)
+		lotSizesText = strings.TrimSpace(strings.Replace(lotSizesText, "Lot size:", "", -1))
+		if strings.Contains(lotSizesText, "sqft") == true {
+			zc.CrawlerTables.ZillowData.LotSizeSF = lotSizesText
+		}
+		if strings.Contains(lotSizesText, "Acres") == true {
+			zc.CrawlerTables.ZillowData.LotSizeAcres = lotSizesText
 		}
 
 	}
