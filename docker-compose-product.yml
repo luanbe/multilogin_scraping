@@ -15,14 +15,12 @@ services:
     networks: # Networks to join (Services on the same network can communicate with each other using their name)
       - backend
   redis:
-    image: redis:alpine
-    expose:
-      - "6379"
+    image: redis:5-alpine
     ports:
-      - "6379:6379"
-    environment:
-      - REDIS_REPLICATION_MODE=master
-      - ALLOW_EMPTY_PASSWORD=yes
+      - "6380:6380"
+    command: redis-server --port 6380
+    volumes:
+      - ./data/redis:/data
     restart: always
     networks:
       - backend
@@ -32,9 +30,9 @@ services:
     ports:
       - 5672:5672   # for sender and consumer connections
       - 15672:15672 # for serve RabbitMQ GUI
-      #volumes:
-      #- ~/rabbitmq/data/:/var/lib/rabbitmq
-      #- ~/rabbitmq/log/:/var/log/rabbitmq
+    volumes:
+      - ./data/rabbitmq/lib:/var/lib/rabbitmq
+      - ./data/rabbitmq/log/:/var/log/rabbitmq
     environment:
       - RABBITMQ_DEFAULT_USER=root
       - RABBITMQ_DEFAULT_PASS=root
