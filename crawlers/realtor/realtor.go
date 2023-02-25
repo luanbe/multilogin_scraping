@@ -12,7 +12,10 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/net/html"
 	"gorm.io/gorm"
+	"multilogin_scraping/app/models/entity"
+	"multilogin_scraping/app/registry"
 	"multilogin_scraping/app/schemas"
+	"multilogin_scraping/app/service"
 	"multilogin_scraping/crawlers"
 	util2 "multilogin_scraping/pkg/utils"
 	"strconv"
@@ -21,19 +24,27 @@ import (
 )
 
 type RealtorCrawler struct {
-	BaseSel        *crawlers.BaseSelenium
-	CRealtor       *colly.Collector
-	Logger         *zap.Logger
-	CrawlerBlocked bool
-	BrowserTurnOff bool
-	CrawlerSchemas *CrawlerSchemas
-	Proxy          *util2.Proxy
-	Doc            *html.Node
+	BaseSel         *crawlers.BaseSelenium
+	CRealtor        *colly.Collector
+	Logger          *zap.Logger
+	CrawlerBlocked  bool
+	BrowserTurnOff  bool
+	CrawlerSchemas  *CrawlerSchemas
+	CrawlerTables   *CrawlerTables
+	CrawlerServices CrawlerServices
+	Proxy           *util2.Proxy
+	Doc             *html.Node
+}
+type CrawlerServices struct {
+	realtorService service.RealtorService
 }
 
 type CrawlerSchemas struct {
-	RealtorData *schemas.RealtorData
-	SearchReq   *schemas.RealtorSearchPageReq
+	SearchReq *schemas.RealtorSearchPageReq
+}
+
+type CrawlerTables struct {
+	RealtorData *entity.Realtor
 }
 
 const searchURL = "https://parser-external.geo.moveaws.com/suggest?%s"
@@ -56,9 +67,12 @@ func NewRealtorCrawler(
 		BrowserTurnOff: false,
 		Proxy:          proxy,
 		CrawlerSchemas: &CrawlerSchemas{
-			RealtorData: &schemas.RealtorData{},
-			SearchReq:   &schemas.RealtorSearchPageReq{},
+			SearchReq: &schemas.RealtorSearchPageReq{},
 		},
+		CrawlerTables: &CrawlerTables{
+			&entity.Realtor{},
+		},
+		CrawlerServices: CrawlerServices{registry.RegisterRealtorService(db)},
 	}
 }
 
@@ -98,7 +112,7 @@ func (rc *RealtorCrawler) UserAgentBrowserToColly() error {
 // RunRealtorCrawlerAPI with a loop to run crawler
 func (rc *RealtorCrawler) RunRealtorCrawlerAPI(mprID string) error {
 	rc.Logger.Info("Zillow Data is crawling...")
-	rc.CrawlerSchemas.RealtorData.URL = fmt.Sprint(viper.GetString("crawler.realtor_crawler.url"), "realestateandhomes-detail/M", mprID)
+	rc.CrawlerTables.RealtorData.URL = fmt.Sprint(viper.GetString("crawler.realtor_crawler.url"), "realestateandhomes-detail/M", mprID)
 
 	err := func(address string) error {
 		if err := rc.BaseSel.WebDriver.Get(address); err != nil {
@@ -124,7 +138,7 @@ func (rc *RealtorCrawler) RunRealtorCrawlerAPI(mprID string) error {
 
 		return nil
 
-	}(rc.CrawlerSchemas.RealtorData.URL)
+	}(rc.CrawlerTables.RealtorData.URL)
 
 	if err != nil {
 		rc.Logger.Error(err.Error())
@@ -133,6 +147,10 @@ func (rc *RealtorCrawler) RunRealtorCrawlerAPI(mprID string) error {
 		// TODO: Update error for crawling here
 	}
 	rc.Logger.Info("Completed to crawl data")
+	if err := rc.CrawlerServices.realtorService.AddRealtor(rc.CrawlerTables.RealtorData); err != nil {
+		return err
+	}
+	rc.Logger.Info("Added/Updated record to Realtor Table")
 	return nil
 }
 
@@ -171,10 +189,10 @@ func (rc *RealtorCrawler) CrawlSearchData(crawlerSearchRes *schemas.CrawlerSearc
 	data := &schemas.RealtorSearchPageRes{}
 	search := fmt.Sprintf(
 		"%s %s %s %s",
-		crawlerSearchRes.Search.Address,
-		crawlerSearchRes.Search.City,
-		crawlerSearchRes.Search.State,
-		crawlerSearchRes.Search.Zipcode,
+		crawlerSearchRes.CrawlerRequest.Search.Address,
+		crawlerSearchRes.CrawlerRequest.Search.City,
+		crawlerSearchRes.CrawlerRequest.Search.State,
+		crawlerSearchRes.CrawlerRequest.Search.Zipcode,
 	)
 	rc.CrawlerSchemas.SearchReq = &schemas.RealtorSearchPageReq{
 		Input:     search,
@@ -216,10 +234,10 @@ func (rc *RealtorCrawler) CrawlSearchData(crawlerSearchRes *schemas.CrawlerSearc
 		return "", err
 	}
 	for _, result := range data.Autocomplete {
-		if result.Line == crawlerSearchRes.Search.Address &&
-			result.City == crawlerSearchRes.Search.City &&
-			result.StateCode == crawlerSearchRes.Search.State &&
-			result.PostalCode == crawlerSearchRes.Search.Zipcode {
+		if result.Line == crawlerSearchRes.CrawlerRequest.Search.Address &&
+			result.City == crawlerSearchRes.CrawlerRequest.Search.City &&
+			result.StateCode == crawlerSearchRes.CrawlerRequest.Search.State &&
+			result.PostalCode == crawlerSearchRes.CrawlerRequest.Search.Zipcode {
 			return result.MprID, nil
 		}
 	}
@@ -350,7 +368,7 @@ func (rc *RealtorCrawler) ParseBed() {
 	if bedInt, err := strconv.Atoi(bedText); err != nil {
 		rc.Logger.Error(fmt.Sprintf("Parse Bed: %v", err.Error()))
 	} else {
-		rc.CrawlerSchemas.RealtorData.Bed = bedInt
+		rc.CrawlerTables.RealtorData.Bed = float64(bedInt)
 	}
 }
 
@@ -368,14 +386,14 @@ func (rc *RealtorCrawler) ParseBath() {
 	if bathInt, err := strconv.Atoi(bathText); err != nil {
 		rc.Logger.Error(fmt.Sprintf("Parse Bath: %v", err.Error()))
 	} else {
-		rc.CrawlerSchemas.RealtorData.Bath = bathInt
+		rc.CrawlerTables.RealtorData.Bath = float64(bathInt)
 	}
 }
 
 // ParsePropertyStatus for checking Property Status
 func (rc *RealtorCrawler) ParsePropertyStatus() {
-	if rc.CrawlerSchemas.RealtorData.Bed > 0 || rc.CrawlerSchemas.RealtorData.Bath > 0 {
-		rc.CrawlerSchemas.RealtorData.PropertyStatus = true
+	if rc.CrawlerTables.RealtorData.Bed > 0 || rc.CrawlerTables.RealtorData.Bath > 0 {
+		rc.CrawlerTables.RealtorData.PropertyStatus = true
 	}
 }
 
@@ -395,7 +413,7 @@ func (rc *RealtorCrawler) ParseFullBathrooms() {
 		rc.Logger.Error(fmt.Sprintf("Parse full bathrooms: %v", err.Error()))
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.FullBathrooms = fullBathroomsFloat
+	rc.CrawlerTables.RealtorData.FullBathrooms = fullBathroomsFloat
 }
 
 // ParseSF for parsing SF
@@ -412,7 +430,7 @@ func (rc *RealtorCrawler) ParseSF() {
 		return
 	}
 
-	rc.CrawlerSchemas.RealtorData.SF = sfFloat
+	rc.CrawlerTables.RealtorData.SF = sfFloat
 }
 
 // ParseSalePrice for parsing Sale Price
@@ -430,7 +448,7 @@ func (rc *RealtorCrawler) ParseSalePrice() {
 		return
 	}
 
-	rc.CrawlerSchemas.RealtorData.SalesPrice = salePriceFloat
+	rc.CrawlerTables.RealtorData.SalesPrice = salePriceFloat
 }
 
 // ParseEstPayment for parsing Estimate Payment
@@ -440,7 +458,7 @@ func (rc *RealtorCrawler) ParseEstPayment() {
 		rc.Logger.Warn("Parse Est Payment: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.EstPayment = htmlquery.InnerText(estPaymentDoc)
+	rc.CrawlerTables.RealtorData.EstPayment = htmlquery.InnerText(estPaymentDoc)
 }
 
 // ParsePrincipalInterest for parsing Principal Interest
@@ -453,7 +471,7 @@ func (rc *RealtorCrawler) ParsePrincipalInterest() {
 		return
 	}
 
-	rc.CrawlerSchemas.RealtorData.PrincipalInterest = htmlquery.InnerText(principalInterestDoc)
+	rc.CrawlerTables.RealtorData.PrincipalInterest = htmlquery.InnerText(principalInterestDoc)
 }
 
 // ParseMortgageInsurance for parsing Mortgage Insurance
@@ -463,7 +481,7 @@ func (rc *RealtorCrawler) ParseMortgageInsurance() {
 		rc.Logger.Warn("Parse Mortgage Insurance: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.MortgageInsurance = htmlquery.InnerText(mortgageInsuranceDoc)
+	rc.CrawlerTables.RealtorData.MortgageInsurance = htmlquery.InnerText(mortgageInsuranceDoc)
 }
 
 // ParsePropertyTaxes for parsing Property Taxes
@@ -473,7 +491,7 @@ func (rc *RealtorCrawler) ParsePropertyTaxes() {
 		rc.Logger.Warn("Parse Property Taxes: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.PropertyTaxes = htmlquery.InnerText(propertyTaxesDoc)
+	rc.CrawlerTables.RealtorData.PropertyTaxes = htmlquery.InnerText(propertyTaxesDoc)
 }
 
 // ParseHomeInsurance for parsing Home Insurance
@@ -483,17 +501,24 @@ func (rc *RealtorCrawler) ParseHomeInsurance() {
 		rc.Logger.Warn("Parse Home Insurance: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.HomeInsurance = htmlquery.InnerText(homeInsuranceDoc)
+	rc.CrawlerTables.RealtorData.HomeInsurance = htmlquery.InnerText(homeInsuranceDoc)
 }
 
 // ParseHOAFees for parsing HOA Fees
 func (rc *RealtorCrawler) ParseHOAFees() {
-	hoaFeesDoc := htmlquery.FindOne(rc.Doc, "//div[contains(text(), \"HOA fees\")]/following-sibling::div")
+	hoaFeesDoc := htmlquery.FindOne(rc.Doc, "//div[@id=\"section_summary\"]//*[contains(text(), \"HOA Fees\")]/parent::div/following-sibling::div")
 	if hoaFeesDoc == nil {
 		rc.Logger.Warn("Parse HOA Fees: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.HOAFee = htmlquery.InnerText(hoaFeesDoc)
+	hoafeeText := htmlquery.InnerText(hoaFeesDoc)
+	haveHoaFee := strings.HasPrefix(hoafeeText, "$")
+	if haveHoaFee == true {
+		rc.CrawlerTables.RealtorData.HOAFee = hoafeeText
+	} else {
+		rc.CrawlerTables.RealtorData.HOAFee = "$0"
+	}
+
 }
 
 // ParseOverview for parsing overview
@@ -503,7 +528,7 @@ func (rc *RealtorCrawler) ParseOverview() {
 		rc.Logger.Warn("Parse Overview: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.HOAFee = htmlquery.InnerText(overviewDoc)
+	rc.CrawlerTables.RealtorData.Overview = htmlquery.InnerText(overviewDoc)
 }
 
 // ParseSource for parsing source
@@ -513,7 +538,7 @@ func (rc *RealtorCrawler) ParseSource() {
 		rc.Logger.Warn("Parse Source: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.Source = htmlquery.InnerText(sourceDoc)
+	rc.CrawlerTables.RealtorData.Source = htmlquery.InnerText(sourceDoc)
 }
 
 // ParsePropertyType for parsing Property Type
@@ -523,7 +548,7 @@ func (rc *RealtorCrawler) ParsePropertyType() {
 		rc.Logger.Warn("Parse Property Type: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.PropertyType = htmlquery.InnerText(propertyTypeDoc)
+	rc.CrawlerTables.RealtorData.PropertyType = htmlquery.InnerText(propertyTypeDoc)
 }
 
 // ParseYearBuilt for parsing Year Built
@@ -533,7 +558,7 @@ func (rc *RealtorCrawler) ParseYearBuilt() {
 		rc.Logger.Warn("Parse Year Built: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.YearBuilt = htmlquery.InnerText(yearBuiltDoc)
+	rc.CrawlerTables.RealtorData.YearBuilt = htmlquery.InnerText(yearBuiltDoc)
 }
 
 // ParseNaturalGas for parsing Natural Gas
@@ -543,7 +568,7 @@ func (rc *RealtorCrawler) ParseNaturalGas() {
 		rc.Logger.Warn("Parse Natural Gas: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.NaturalGas = true
+	rc.CrawlerTables.RealtorData.NaturalGas = true
 }
 
 // ParseCentralAir for parsing Central Air
@@ -553,7 +578,7 @@ func (rc *RealtorCrawler) ParseCentralAir() {
 		rc.Logger.Warn("Parse Central Air: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.CentralAir = true
+	rc.CrawlerTables.RealtorData.CentralAir = true
 }
 
 // ParseGarageSpaces for parsing Garage Spaces
@@ -563,7 +588,7 @@ func (rc *RealtorCrawler) ParseGarageSpaces() {
 		rc.Logger.Warn("Parse Garage Spaces: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.OfGarageSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(garageSpacesDoc), "Garage Spaces:", "", -1))
+	rc.CrawlerTables.RealtorData.OfGarageSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(garageSpacesDoc), "Garage Spaces:", "", -1))
 }
 
 // ParseLotSize for parsing Lot Size
@@ -580,7 +605,7 @@ func (rc *RealtorCrawler) ParseLotSize() {
 		return
 	}
 
-	rc.CrawlerSchemas.RealtorData.LotSizeSF = lotSizeFloat
+	rc.CrawlerTables.RealtorData.LotSizeSF = fmt.Sprint(lotSizeFloat)
 }
 
 // ParseLotSizeAcres for parsing Lot Size Acres
@@ -590,7 +615,7 @@ func (rc *RealtorCrawler) ParseLotSizeAcres() {
 		rc.Logger.Warn("Parse Lot Size Acres: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.OfGarageSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(lotSizeAcresDoc), "Lot Size Acres:", "", -1))
+	rc.CrawlerTables.RealtorData.OfGarageSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(lotSizeAcresDoc), "Lot Size Acres:", "", -1))
 }
 
 // ParseInteriorFeatures for parsing Interior Features
@@ -604,7 +629,7 @@ func (rc *RealtorCrawler) ParseInteriorFeatures() {
 	for _, v := range interiorFeaturesDocs {
 		interiorFeaturesList = append(interiorFeaturesList, htmlquery.InnerText(v))
 	}
-	rc.CrawlerSchemas.RealtorData.InteriorFeatures = strings.Join(interiorFeaturesList, ", ")
+	rc.CrawlerTables.RealtorData.InteriorFeatures = strings.Join(interiorFeaturesList, ", ")
 }
 
 // ParsePrimaryBedroomLevel for parsing Primary Bedroom Level
@@ -614,7 +639,7 @@ func (rc *RealtorCrawler) ParsePrimaryBedroomLevel() {
 		rc.Logger.Warn("Parse Primary Bedroom Level: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.PrimaryBedroomLevel = strings.TrimSpace(strings.Replace(htmlquery.InnerText(primaryBedroomLevelDoc), "Bedrooms:", "", -1))
+	rc.CrawlerTables.RealtorData.PrimaryBedroomLevel = strings.TrimSpace(strings.Replace(htmlquery.InnerText(primaryBedroomLevelDoc), "Bedrooms:", "", -1))
 }
 
 // ParseFlooringType for parsing Flooring Type
@@ -624,7 +649,7 @@ func (rc *RealtorCrawler) ParseFlooringType() {
 		rc.Logger.Warn("Parse Flooring Type: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.FlooringType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(flooringTypeDoc), "Flooring:", "", -1))
+	rc.CrawlerTables.RealtorData.FlooringType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(flooringTypeDoc), "Flooring:", "", -1))
 }
 
 // ParseHeatingType for parsing Heating Type
@@ -634,7 +659,7 @@ func (rc *RealtorCrawler) ParseHeatingType() {
 		rc.Logger.Warn("Parse Heating Type: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.HeatingType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(heatingTypeDoc), "Heating Features:", "", -1))
+	rc.CrawlerTables.RealtorData.HeatingType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(heatingTypeDoc), "Heating Features:", "", -1))
 }
 
 // ParseTotalParkingSpaces for parsing Total Parking Spaces
@@ -644,7 +669,7 @@ func (rc *RealtorCrawler) ParseTotalParkingSpaces() {
 		rc.Logger.Warn("Parse Total Parking Spaces: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.TotalParkingSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(totalParkingSpacesDoc), "Parking Total:", "", -1))
+	rc.CrawlerTables.RealtorData.TotalParkingSpaces = strings.TrimSpace(strings.Replace(htmlquery.InnerText(totalParkingSpacesDoc), "Parking Total:", "", -1))
 }
 
 // ParseLotFeatures for parsing Lot Features
@@ -658,7 +683,7 @@ func (rc *RealtorCrawler) ParseLotFeatures() {
 	for _, v := range lotFeaturesDocs {
 		lotFeaturesList = append(lotFeaturesList, htmlquery.InnerText(v))
 	}
-	rc.CrawlerSchemas.RealtorData.LotFeatures = strings.Join(lotFeaturesList, ", ")
+	rc.CrawlerTables.RealtorData.LotFeatures = strings.Join(lotFeaturesList, ", ")
 }
 
 // ParseProperySubType for parsing Propery SubType
@@ -668,7 +693,7 @@ func (rc *RealtorCrawler) ParseProperySubType() {
 		rc.Logger.Warn("Parse Propery SubType: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.ProperySubType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(properySubTypeDoc), "Property Subtype:", "", -1))
+	rc.CrawlerTables.RealtorData.ProperySubType = strings.TrimSpace(strings.Replace(htmlquery.InnerText(properySubTypeDoc), "Property Subtype:", "", -1))
 }
 
 // ParseConstructionMaterials for parsing Construction Materials
@@ -678,7 +703,7 @@ func (rc *RealtorCrawler) ParseConstructionMaterials() {
 		rc.Logger.Warn("Parse Construction Materials: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.ConstructionMaterials = strings.TrimSpace(strings.Replace(htmlquery.InnerText(constructionMaterialsDoc), "Construction Materials:", "", -1))
+	rc.CrawlerTables.RealtorData.ConstructionMaterials = strings.TrimSpace(strings.Replace(htmlquery.InnerText(constructionMaterialsDoc), "Construction Materials:", "", -1))
 }
 
 // ParseFoundation for parsing Foundation
@@ -688,7 +713,7 @@ func (rc *RealtorCrawler) ParseFoundation() {
 		rc.Logger.Warn("Parse Foundation: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.Foundation = strings.TrimSpace(strings.Replace(htmlquery.InnerText(foundationDoc), "Foundation Details:", "", -1))
+	rc.CrawlerTables.RealtorData.Foundation = strings.TrimSpace(strings.Replace(htmlquery.InnerText(foundationDoc), "Foundation Details:", "", -1))
 }
 
 // ParseSubdivision for parsing Subdivision
@@ -698,7 +723,7 @@ func (rc *RealtorCrawler) ParseSubdivision() {
 		rc.Logger.Warn("Parse Subdivision: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.Subdivision = strings.TrimSpace(strings.Replace(htmlquery.InnerText(SubdivisionDoc), "Subdivision:", "", -1))
+	rc.CrawlerTables.RealtorData.Subdivision = strings.TrimSpace(strings.Replace(htmlquery.InnerText(SubdivisionDoc), "Subdivision:", "", -1))
 }
 
 // ParseElementarySchool for parsing Elementary School
@@ -708,7 +733,7 @@ func (rc *RealtorCrawler) ParseElementarySchool() {
 		rc.Logger.Warn("Parse Elementary School: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.ElementarySchool = strings.TrimSpace(strings.Replace(htmlquery.InnerText(elementarySchoolDoc), "Elementary School:", "", -1))
+	rc.CrawlerTables.RealtorData.ElementarySchool = strings.TrimSpace(strings.Replace(htmlquery.InnerText(elementarySchoolDoc), "Elementary School:", "", -1))
 }
 
 // ParseMiddleSchool for parsing Middle School
@@ -718,7 +743,7 @@ func (rc *RealtorCrawler) ParseMiddleSchool() {
 		rc.Logger.Warn("Parse Middle School: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.MiddleSchool = strings.TrimSpace(strings.Replace(htmlquery.InnerText(middleSchoolDoc), "Middle School:", "", -1))
+	rc.CrawlerTables.RealtorData.MiddleSchool = strings.TrimSpace(strings.Replace(htmlquery.InnerText(middleSchoolDoc), "Middle School:", "", -1))
 }
 
 // ParseHighSchool for parsing High School
@@ -728,7 +753,7 @@ func (rc *RealtorCrawler) ParseHighSchool() {
 		rc.Logger.Warn("Parse High School: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.HighSchool = strings.TrimSpace(strings.Replace(htmlquery.InnerText(highSchoolDoc), "High School:", "", -1))
+	rc.CrawlerTables.RealtorData.HighSchool = strings.TrimSpace(strings.Replace(htmlquery.InnerText(highSchoolDoc), "High School:", "", -1))
 }
 
 // ParseDataSource for parsing Data Source
@@ -738,7 +763,7 @@ func (rc *RealtorCrawler) ParseDataSource() {
 		rc.Logger.Warn("Parse Data Source: Not found element.")
 		return
 	}
-	rc.CrawlerSchemas.RealtorData.YearBuilt = htmlquery.InnerText(dataSourceDoc)
+	rc.CrawlerTables.RealtorData.YearBuilt = htmlquery.InnerText(dataSourceDoc)
 }
 
 // ParsePictures for parsing pictures
@@ -754,6 +779,6 @@ func (rc *RealtorCrawler) ParsePictures() {
 	for _, pic := range pictures {
 		picSlice = append(picSlice, htmlquery.SelectAttr(pic, "src"))
 	}
-	rc.CrawlerSchemas.RealtorData.Pictures = picSlice
+	rc.CrawlerTables.RealtorData.Pictures = strings.Join(picSlice, ", ")
 
 }

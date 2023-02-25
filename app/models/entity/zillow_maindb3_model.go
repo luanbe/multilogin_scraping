@@ -57,7 +57,6 @@ type ZillowMaindb3Address struct {
 	City                   string                   `gorm:"type:varchar(250);column:City" json:"City"`
 	Units                  string                   `gorm:"type:varchar(250);column:Units" json:"Units"`
 	CrawlingStatus         string                   `gorm:"type:varchar(50)" json:"crawling_status"`
-	ZillowData             ZillowDetail             `gorm:"foreignKey:Maindb3ID;constraint:OnUpdate:CASCADE;OnDelete:SET NULL;"`
 	ZillowPriceHistory     []ZillowPriceHistory     `gorm:"foreignKey:Maindb3ID;constraint:OnUpdate:CASCADE;OnDelete:SET NULL;"`
 	ZillowPublicTaxHistory []ZillowPublicTaxHistory `gorm:"foreignKey:Maindb3ID;constraint:OnUpdate:CASCADE;OnDelete:SET NULL;"`
 }

@@ -81,22 +81,27 @@ func main() {
 				if err := redis.GetRedis(body["task_id"].(string), crawlerSearchRes); err != nil {
 					workerLog.Error(err.Error())
 				} else {
-					go zillowProcessor.NewZillowApiTask(
-						crawlerSearchRes,
-						&proxies[util2.RandIntRange(0, len(proxies))],
-						redis,
-					)
-					go realtorProcessor.NewRealtorApiTask(
-						crawlerSearchRes,
-						&proxies[util2.RandIntRange(0, len(proxies))],
-						redis,
-					)
-					go movotoProcessor.NewMovotoApiTask(
-						crawlerSearchRes,
-						&proxies[util2.RandIntRange(0, len(proxies))],
-						redis,
-					)
-
+					if crawlerSearchRes.CrawlerRequest.CrawlersActive.Zillow == true {
+						go zillowProcessor.NewZillowApiTask(
+							crawlerSearchRes,
+							&proxies[util2.RandIntRange(0, len(proxies))],
+							redis,
+						)
+					}
+					if crawlerSearchRes.CrawlerRequest.CrawlersActive.Realtor == true {
+						go realtorProcessor.NewRealtorApiTask(
+							crawlerSearchRes,
+							&proxies[util2.RandIntRange(0, len(proxies))],
+							redis,
+						)
+					}
+					if crawlerSearchRes.CrawlerRequest.CrawlersActive.Movoto == true {
+						go movotoProcessor.NewMovotoApiTask(
+							crawlerSearchRes,
+							&proxies[util2.RandIntRange(0, len(proxies))],
+							redis,
+						)
+					}
 				}
 
 			}

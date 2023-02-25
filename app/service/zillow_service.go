@@ -6,10 +6,10 @@ import (
 )
 
 type ZillowService interface {
-	AddZillow(zillowData *entity.ZillowDetail) error
-	UpdateZillow(zillowData *entity.ZillowDetail, id uint64) error
-	GetZillowByID(id uint64) (*entity.ZillowDetail, error)
-	GetZillowByURL(url string) (*entity.ZillowDetail, error)
+	AddZillow(zillowData *entity.Zillow) error
+	UpdateZillow(zillowData *entity.Zillow, id uint64) error
+	GetZillowByID(id uint64) (*entity.Zillow, error)
+	GetZillowByURL(url string) (*entity.Zillow, error)
 	UpdateZillowPriceHistory(zillowPriceHistories []*entity.ZillowPriceHistory) error
 	UpdateZillowPublicTaxHistory(zillowPublicTaxHistories []*entity.ZillowPublicTaxHistory) error
 }
@@ -28,21 +28,24 @@ func NewZillowService(
 	return &ZillowServiceImpl{baseRepo, zillowRepo}
 }
 
-func (s *ZillowServiceImpl) AddZillow(zillowData *entity.ZillowDetail) error {
-	if err := s.zillowRepo.AddZillow(zillowData); err != nil {
-		return err
+func (s *ZillowServiceImpl) AddZillow(zillowData *entity.Zillow) error {
+	oldZillowData, _ := s.zillowRepo.GetZillowFirst(map[string]interface{}{"url": zillowData.URL})
+	if oldZillowData == nil {
+		if err := s.zillowRepo.AddZillow(zillowData); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (s *ZillowServiceImpl) UpdateZillow(zillowData *entity.ZillowDetail, id uint64) error {
+func (s *ZillowServiceImpl) UpdateZillow(zillowData *entity.Zillow, id uint64) error {
 	if err := s.zillowRepo.UpdateZillow(zillowData, map[string]interface{}{"id": id}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *ZillowServiceImpl) GetZillowByID(id uint64) (*entity.ZillowDetail, error) {
+func (s *ZillowServiceImpl) GetZillowByID(id uint64) (*entity.Zillow, error) {
 	zillowData, err := s.zillowRepo.GetZillowFirst(map[string]interface{}{"maindb3_id": id})
 	if err != nil && err.Error() != "record not found" {
 		return nil, err
@@ -51,7 +54,7 @@ func (s *ZillowServiceImpl) GetZillowByID(id uint64) (*entity.ZillowDetail, erro
 	return zillowData, nil
 }
 
-func (s *ZillowServiceImpl) GetZillowByURL(url string) (*entity.ZillowDetail, error) {
+func (s *ZillowServiceImpl) GetZillowByURL(url string) (*entity.Zillow, error) {
 	zillowData, err := s.zillowRepo.GetZillowFirst(map[string]interface{}{"url": url})
 	if err != nil && err.Error() != "record not found" {
 		return nil, err

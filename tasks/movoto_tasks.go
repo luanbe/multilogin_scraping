@@ -53,7 +53,7 @@ func (rp MovotoProcessor) NewMovotoApiTask(
 				crawlerSearchRes.Movoto.Status = viper.GetString("crawler.crawler_status.failed")
 			} else {
 				crawlerSearchRes.Movoto.Status = viper.GetString("crawler.crawler_status.succeeded")
-				crawlerSearchRes.Movoto.Data = movotoCrawler.CrawlerSchemas.MovotoData
+				crawlerSearchRes.Movoto.Data = movotoCrawler.CrawlerTables.MovotoData
 
 			}
 		}

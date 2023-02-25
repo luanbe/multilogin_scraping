@@ -7,43 +7,53 @@ import (
 )
 
 type CrawlerRequest struct {
+	Search         CrawlerSearch  `json:"search"`
+	CrawlersActive CrawlersStatus `json:"crawlers_status"`
+}
+
+type CrawlerSearch struct {
 	Address string `json:"address"`
 	City    string `json:"city"`
 	State   string `json:"state"`
 	Zipcode string `json:"zipcode"`
 }
+type CrawlersStatus struct {
+	Zillow  bool `json:"zillow"`
+	Realtor bool `json:"realtor"`
+	Movoto  bool `json:"movoto"`
+}
 
 func (c *CrawlerRequest) Bind(r *http.Request) error {
-	if c.Address == "" {
-		return errors.New("missing required Address fields.")
+	if c.Search.Address == "" || c.Search.City == "" || c.Search.State == "" || c.Search.Zipcode == "" {
+		return errors.New("missing required address, city, state and zipcode field.")
 	}
 	return nil
 }
 
 type CrawlerSearchRes struct {
-	TaskID  string          `json:"task_id"`
-	Search  *CrawlerRequest `json:"search"`
-	Zillow  *ZillowDetail   `json:"zillow"`
-	Realtor *RealtorDetail  `json:"realtor"`
-	Movoto  *MovotoDetail   `json:"movoto"`
+	TaskID         string          `json:"task_id"`
+	CrawlerRequest *CrawlerRequest `json:"crawler_request"`
+	Zillow         *ZillowDetail   `json:"zillow"`
+	Realtor        *RealtorDetail  `json:"realtor"`
+	Movoto         *MovotoDetail   `json:"movoto"`
 }
 
 type ZillowDetail struct {
-	Status string               `json:"status"`
-	Error  string               `json:"error"`
-	Data   *entity.ZillowDetail `json:"data"`
+	Status string         `json:"status"`
+	Error  string         `json:"error"`
+	Data   *entity.Zillow `json:"data"`
 }
 
 type RealtorDetail struct {
-	Status string       `json:"status"`
-	Error  string       `json:"error"`
-	Data   *RealtorData `json:"data"`
+	Status string          `json:"status"`
+	Error  string          `json:"error"`
+	Data   *entity.Realtor `json:"data"`
 }
 
 type MovotoDetail struct {
-	Status string      `json:"status"`
-	Error  string      `json:"error"`
-	Data   *MovotoData `json:"data"`
+	Status string         `json:"status"`
+	Error  string         `json:"error"`
+	Data   *entity.Movoto `json:"data"`
 }
 
 func (ct *CrawlerSearchRes) Render(w http.ResponseWriter, r *http.Request) error {

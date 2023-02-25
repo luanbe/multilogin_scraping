@@ -53,7 +53,7 @@ func (rp RealtorProcessor) NewRealtorApiTask(
 
 			} else {
 				crawlerSearchRes.Realtor.Status = viper.GetString("crawler.crawler_status.succeeded")
-				crawlerSearchRes.Realtor.Data = realtorCrawler.CrawlerSchemas.RealtorData
+				crawlerSearchRes.Realtor.Data = realtorCrawler.CrawlerTables.RealtorData
 			}
 			realtorCrawler.BaseSel.StopSessionBrowser(true)
 			break

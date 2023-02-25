@@ -29,9 +29,9 @@ func (cd *CrawlerDelivery) Routes() chi.Router {
 }
 
 func (cd *CrawlerDelivery) Crawl(w http.ResponseWriter, r *http.Request) {
-	data := &schemas.CrawlerRequest{}
+	crawlerRequest := &schemas.CrawlerRequest{}
 
-	if err := render.Bind(r, data); err != nil {
+	if err := render.Bind(r, crawlerRequest); err != nil {
 		render.Render(w, r, schemas.ErrInvalidRequest(err))
 		return
 	}
@@ -42,25 +42,36 @@ func (cd *CrawlerDelivery) Crawl(w http.ResponseWriter, r *http.Request) {
 	}
 	msg := helper.Message{
 		"task_id": redisId.String(),
-		"data":    data,
+		"data":    crawlerRequest,
 		"worker":  viper.GetString("crawler.rabbitmq.tasks.crawl_address.routing_key"),
 	}
 
 	utils := helper.NewUtils()
-
+	zillowStatus := "disabled"
+	if crawlerRequest.CrawlersActive.Zillow == true {
+		zillowStatus = viper.GetString("crawler.crawler_status.start")
+	}
+	realtorStatus := "disabled"
+	if crawlerRequest.CrawlersActive.Realtor == true {
+		realtorStatus = viper.GetString("crawler.crawler_status.start")
+	}
+	movotoStatus := "disabled"
+	if crawlerRequest.CrawlersActive.Movoto == true {
+		movotoStatus = viper.GetString("crawler.crawler_status.start")
+	}
 	crawlerSearchRes := schemas.CrawlerSearchRes{
-		TaskID: redisId.String(),
-		Search: data,
+		TaskID:         redisId.String(),
+		CrawlerRequest: crawlerRequest,
 		Zillow: &schemas.ZillowDetail{
-			Status: viper.GetString("crawler.crawler_status.start"),
+			Status: zillowStatus,
 			Error:  "",
 		},
 		Realtor: &schemas.RealtorDetail{
-			Status: viper.GetString("crawler.crawler_status.start"),
+			Status: realtorStatus,
 			Error:  "",
 		},
 		Movoto: &schemas.MovotoDetail{
-			Status: viper.GetString("crawler.crawler_status.start"),
+			Status: movotoStatus,
 			Error:  "",
 		},
 	}

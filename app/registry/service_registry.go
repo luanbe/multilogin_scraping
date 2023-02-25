@@ -24,3 +24,15 @@ func RegisterZillowService(db *gorm.DB) service.ZillowService {
 		rp.NewBaseRepository(db),
 		rp.NewZillowRepository(rp.NewBaseRepository(db)))
 }
+
+func RegisterRealtorService(db *gorm.DB) service.RealtorService {
+	return service.NewRealtorService(
+		rp.NewBaseRepository(db),
+		rp.NewRealtorRepository(rp.NewBaseRepository(db)))
+}
+
+func RegisterMovotoService(db *gorm.DB) service.MovotoService {
+	return service.NewMovotoService(
+		rp.NewBaseRepository(db),
+		rp.NewMovotoRepository(rp.NewBaseRepository(db)))
+}

@@ -44,8 +44,8 @@ type ZillowCrawler struct {
 
 type CrawlerTables struct {
 	Maindb3                *entity.ZillowMaindb3Address
-	ZillowData             *entity.ZillowDetail
-	ZillowSearchData       []*entity.ZillowDetail
+	ZillowData             *entity.Zillow
+	ZillowSearchData       []*entity.Zillow
 	ZillowPriceHistory     []*entity.ZillowPriceHistory
 	ZillowPublicTaxHistory []*entity.ZillowPublicTaxHistory
 	MapBounds              *schemas.MapBounds
@@ -78,8 +78,8 @@ func NewZillowCrawler(
 		CZillow:   c,
 		CrawlerTables: &CrawlerTables{
 			&entity.ZillowMaindb3Address{},
-			&entity.ZillowDetail{},
-			[]*entity.ZillowDetail{},
+			&entity.Zillow{},
+			[]*entity.Zillow{},
 			[]*entity.ZillowPriceHistory{},
 			[]*entity.ZillowPublicTaxHistory{},
 			&schemas.MapBounds{},
@@ -140,7 +140,7 @@ func (zc *ZillowCrawler) RunZillowCrawler() error {
 		err := func() error {
 			for _, maindb3 := range zc.Maindb3List {
 				zc.CrawlerTables.Maindb3 = maindb3
-				zc.CrawlerTables.ZillowData = &entity.ZillowDetail{}
+				zc.CrawlerTables.ZillowData = &entity.Zillow{}
 				zc.ShowLogInfo("Zillow Data is crawling...")
 				zc.CrawlerTables.ZillowData.URL = zc.GetURLCrawling()
 				if err := zc.CrawlAddress(zc.CrawlerTables.ZillowData.URL); err != nil {
@@ -172,10 +172,10 @@ func (zc *ZillowCrawler) RunZillowCrawlerAPI(crawlerSearchRes *schemas.CrawlerSe
 	zc.CrawlerTables.ZillowData.URL = fmt.Sprintf(
 		"%s%s-%s-%s-%s",
 		zillowRootURL,
-		strings.Replace(crawlerSearchRes.Search.Address, " ", "-", -1),
-		strings.Replace(crawlerSearchRes.Search.City, " ", "-", -1),
-		crawlerSearchRes.Search.State,
-		crawlerSearchRes.Search.Zipcode,
+		strings.Replace(crawlerSearchRes.CrawlerRequest.Search.Address, " ", "-", -1),
+		strings.Replace(crawlerSearchRes.CrawlerRequest.Search.City, " ", "-", -1),
+		crawlerSearchRes.CrawlerRequest.Search.State,
+		crawlerSearchRes.CrawlerRequest.Search.Zipcode,
 	)
 
 	err := func() error {
@@ -210,6 +210,11 @@ func (zc *ZillowCrawler) RunZillowCrawlerAPI(crawlerSearchRes *schemas.CrawlerSe
 		// TODO: Update error for crawling here
 	}
 	zc.Logger.Info("Completed to crawl data")
+	if err := zc.CrawlerServices.ZillowService.AddZillow(zc.CrawlerTables.ZillowData); err != nil {
+		return err
+	}
+	zc.ShowLogInfo("Added/Updated record to Zillow Table")
+
 	return nil
 }
 
@@ -256,7 +261,7 @@ func (zc *ZillowCrawler) CrawlSearchDataByColly() {
 		return
 	}
 
-	zc.CrawlerTables.ZillowSearchData = []*entity.ZillowDetail{}
+	zc.CrawlerTables.ZillowSearchData = []*entity.Zillow{}
 
 	temSearch := `
 		{
@@ -388,7 +393,7 @@ func (zc *ZillowCrawler) CrawlSearchData() error {
 	}
 
 	urlRun := fmt.Sprintf(searchURL, string(searchPageJson))
-	zc.CrawlerTables.ZillowSearchData = []*entity.ZillowDetail{}
+	zc.CrawlerTables.ZillowSearchData = []*entity.Zillow{}
 	var nextURL string
 	var firstRun bool
 	firstRun = true
@@ -482,7 +487,7 @@ func (zc *ZillowCrawler) CrawlNextSearchData(urlRun string) (string, error) {
 	return "", nil
 }
 
-func (zc *ZillowCrawler) CrawlZillowSearchResultData(result schemas.ZillowSearchPageResResult) *entity.ZillowDetail {
+func (zc *ZillowCrawler) CrawlZillowSearchResultData(result schemas.ZillowSearchPageResResult) *entity.Zillow {
 
 	propertyStatus := false
 	if result.Beds > 0 || result.Baths > 0 {
@@ -490,7 +495,7 @@ func (zc *ZillowCrawler) CrawlZillowSearchResultData(result schemas.ZillowSearch
 	}
 	halfBathRooms := result.HdpData.HomeInfo.Bedrooms / 2
 	fullBathRooms := result.HdpData.HomeInfo.Bathrooms - halfBathRooms
-	return &entity.ZillowDetail{
+	return &entity.Zillow{
 		URL:            result.DetailURL,
 		Address:        result.Address,
 		PropertyStatus: propertyStatus,
@@ -505,7 +510,7 @@ func (zc *ZillowCrawler) CrawlZillowSearchResultData(result schemas.ZillowSearch
 
 }
 
-func (zc *ZillowCrawler) CrawlZillowSearchRelaxedData(result schemas.ZillowSearchPageResRelaxedResult) *entity.ZillowDetail {
+func (zc *ZillowCrawler) CrawlZillowSearchRelaxedData(result schemas.ZillowSearchPageResRelaxedResult) *entity.Zillow {
 
 	propertyStatus := false
 	if result.Beds > 0 || result.Baths > 0 {
@@ -513,7 +518,7 @@ func (zc *ZillowCrawler) CrawlZillowSearchRelaxedData(result schemas.ZillowSearc
 	}
 	halfBathRooms := result.HdpData.HomeInfo.Bedrooms / 2
 	fullBathRooms := result.HdpData.HomeInfo.Bathrooms - halfBathRooms
-	return &entity.ZillowDetail{
+	return &entity.Zillow{
 		URL:            result.DetailURL,
 		Address:        result.Address,
 		PropertyStatus: propertyStatus,
@@ -743,7 +748,6 @@ func (zc *ZillowCrawler) ParseData(source string) error {
 		zc.ParseGreatSchools(doc)
 		zc.ParseDistrict(doc)
 		zc.ParseDataSource(doc)
-		zc.CrawlerTables.ZillowData.Maindb3ID = &zc.CrawlerTables.Maindb3.ID
 	}
 	zc.ParseMapBounds(doc)
 	zc.ParseZillowPriceHistory(doc)

@@ -35,10 +35,15 @@ func main() {
 	}
 	logger.Info("database connected")
 
-	if err := PeriodicTasks(db); err != nil {
-		logger.Fatal(err.Error())
-	}
+	// Make a channel to receive messages into infinite loop.
+	forever := make(chan bool)
 
+	go func() {
+		if err := PeriodicTasks(db); err != nil {
+			logger.Fatal(err.Error())
+		}
+	}()
+	<-forever
 }
 
 func PeriodicTasks(db *gorm.DB) error {

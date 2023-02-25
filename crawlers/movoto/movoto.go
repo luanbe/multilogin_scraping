@@ -11,7 +11,10 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/net/html"
 	"gorm.io/gorm"
+	"multilogin_scraping/app/models/entity"
+	"multilogin_scraping/app/registry"
 	"multilogin_scraping/app/schemas"
+	"multilogin_scraping/app/service"
 	"multilogin_scraping/crawlers"
 	util2 "multilogin_scraping/pkg/utils"
 	"strconv"
@@ -20,19 +23,26 @@ import (
 )
 
 type MovotoCrawler struct {
-	BaseSel        *crawlers.BaseSelenium
-	CMovoto        *colly.Collector
-	Logger         *zap.Logger
-	CrawlerBlocked bool
-	BrowserTurnOff bool
-	CrawlerSchemas *CrawlerSchemas
-	Proxy          *util2.Proxy
-	Doc            *html.Node
+	BaseSel         *crawlers.BaseSelenium
+	CMovoto         *colly.Collector
+	Logger          *zap.Logger
+	CrawlerBlocked  bool
+	BrowserTurnOff  bool
+	CrawlerSchemas  *CrawlerSchemas
+	CrawlerTables   *CrawlerTables
+	CrawlerServices CrawlerServices
+	Proxy           *util2.Proxy
+	Doc             *html.Node
+}
+type CrawlerServices struct {
+	movotoService service.MovotoService
 }
 
 type CrawlerSchemas struct {
-	MovotoData *schemas.MovotoData
-	SearchReq  *schemas.MovotoSearchPageReq
+	SearchReq *schemas.MovotoSearchPageReq
+}
+type CrawlerTables struct {
+	MovotoData *entity.Movoto
 }
 
 const searchURL = "https://www.movoto.com/api/v/search/?%s"
@@ -68,9 +78,12 @@ func NewMovotoCrawler(
 		BrowserTurnOff: false,
 		Proxy:          proxy,
 		CrawlerSchemas: &CrawlerSchemas{
-			MovotoData: &schemas.MovotoData{},
-			SearchReq:  &schemas.MovotoSearchPageReq{},
+			SearchReq: &schemas.MovotoSearchPageReq{},
 		},
+		CrawlerTables: &CrawlerTables{
+			&entity.Movoto{},
+		},
+		CrawlerServices: CrawlerServices{registry.RegisterMovotoService(db)},
 	}
 }
 
@@ -110,17 +123,17 @@ func (mc *MovotoCrawler) UserAgentBrowserToColly() error {
 // RunMovotoCrawlerAPI with a loop to run crawler
 func (mc *MovotoCrawler) RunMovotoCrawlerAPI(searchRes *schemas.MovotoSearchDataRes) error {
 	mc.Logger.Info("Movoto Data is crawling...")
-	mc.CrawlerSchemas.MovotoData.PropertyType = searchRes.PropertyType
+	mc.CrawlerTables.MovotoData.PropertyType = searchRes.PropertyType
 	if searchRes.PropertyType != "" {
-		mc.CrawlerSchemas.MovotoData.PropertyStatus = true
+		mc.CrawlerTables.MovotoData.PropertyStatus = true
 	}
-	mc.CrawlerSchemas.MovotoData.Bath = searchRes.Bath
-	mc.CrawlerSchemas.MovotoData.Bed = searchRes.Bed
-	mc.CrawlerSchemas.MovotoData.LotSizeSF = searchRes.LotSize
-	mc.CrawlerSchemas.MovotoData.HOAFee = searchRes.Hoafee
-	mc.CrawlerSchemas.MovotoData.Pictures = []string{searchRes.TnImgPath}
-	mc.CrawlerSchemas.MovotoData.URL = fmt.Sprint(viper.GetString("crawler.movoto_crawler.url"), searchRes.Path)
-	mc.CrawlerSchemas.MovotoData.Address = fmt.Sprintf(
+	mc.CrawlerTables.MovotoData.Bath = float64(searchRes.Bath)
+	mc.CrawlerTables.MovotoData.Bed = float64(searchRes.Bed)
+	mc.CrawlerTables.MovotoData.LotSizeSF = string(rune(searchRes.LotSize))
+	mc.CrawlerTables.MovotoData.HOAFee = string(rune(searchRes.Hoafee))
+	mc.CrawlerTables.MovotoData.Pictures = searchRes.TnImgPath
+	mc.CrawlerTables.MovotoData.URL = fmt.Sprint(viper.GetString("crawler.movoto_crawler.url"), searchRes.Path)
+	mc.CrawlerTables.MovotoData.Address = fmt.Sprintf(
 		"%s, %s, %s %s",
 		searchRes.Geo.Address,
 		searchRes.Geo.City,
@@ -152,7 +165,7 @@ func (mc *MovotoCrawler) RunMovotoCrawlerAPI(searchRes *schemas.MovotoSearchData
 
 		return nil
 
-	}(mc.CrawlerSchemas.MovotoData.URL)
+	}(mc.CrawlerTables.MovotoData.URL)
 
 	if err != nil {
 		mc.Logger.Error(err.Error())
@@ -161,6 +174,11 @@ func (mc *MovotoCrawler) RunMovotoCrawlerAPI(searchRes *schemas.MovotoSearchData
 		// TODO: Update error for crawling here
 	}
 	mc.Logger.Info("Completed to crawl data")
+	if err := mc.CrawlerServices.movotoService.AddMovoto(mc.CrawlerTables.MovotoData); err != nil {
+		return err
+	}
+	mc.Logger.Info("Added/Updated record to Movoto Table")
+
 	return nil
 }
 
@@ -200,10 +218,10 @@ func (mc *MovotoCrawler) CrawlSearchData(crawlerSearchRes *schemas.CrawlerSearch
 	movotoSearchData := &schemas.MovotoSearchDataRes{}
 	path := fmt.Sprintf(
 		"address %s %s %s %s",
-		crawlerSearchRes.Search.Address,
-		crawlerSearchRes.Search.City,
-		crawlerSearchRes.Search.State,
-		crawlerSearchRes.Search.Zipcode,
+		crawlerSearchRes.CrawlerRequest.Search.Address,
+		crawlerSearchRes.CrawlerRequest.Search.City,
+		crawlerSearchRes.CrawlerRequest.Search.State,
+		crawlerSearchRes.CrawlerRequest.Search.Zipcode,
 	)
 	mc.CrawlerSchemas.SearchReq = &schemas.MovotoSearchPageReq{
 		Path:              path,
@@ -246,10 +264,10 @@ func (mc *MovotoCrawler) CrawlSearchData(crawlerSearchRes *schemas.CrawlerSearch
 	}
 
 	for _, v := range searchRes.Data.Listings {
-		if v.Geo.Address == crawlerSearchRes.Search.Address &&
-			v.Geo.City == crawlerSearchRes.Search.City &&
-			v.Geo.State == crawlerSearchRes.Search.State &&
-			v.Geo.Zipcode == crawlerSearchRes.Search.Zipcode {
+		if v.Geo.Address == crawlerSearchRes.CrawlerRequest.Search.Address &&
+			v.Geo.City == crawlerSearchRes.CrawlerRequest.Search.City &&
+			v.Geo.State == crawlerSearchRes.CrawlerRequest.Search.State &&
+			v.Geo.Zipcode == crawlerSearchRes.CrawlerRequest.Search.Zipcode {
 			return &v, nil
 		}
 	}
@@ -270,13 +288,13 @@ func (mc *MovotoCrawler) ParseData(source string) error {
 			if feature.Name == "Interior" {
 				for _, interior := range feature.Value {
 					if interior.Name == "Bathrooms" {
-						mc.CrawlerSchemas.MovotoData.FullBathrooms, err = strconv.ParseFloat(interior.Value[0].Value, 64)
+						mc.CrawlerTables.MovotoData.FullBathrooms, err = strconv.ParseFloat(interior.Value[0].Value, 64)
 						if err != nil {
 							mc.Logger.Warn(fmt.Sprintf("Parse Full Bathrooms:%s", err.Error()))
 						}
 
-						if mc.CrawlerSchemas.MovotoData.FullBathrooms != 0 {
-							mc.CrawlerSchemas.MovotoData.HalfBathrooms = mc.CrawlerSchemas.MovotoData.FullBathrooms / 2
+						if mc.CrawlerTables.MovotoData.FullBathrooms != 0 {
+							mc.CrawlerTables.MovotoData.HalfBathrooms = mc.CrawlerTables.MovotoData.FullBathrooms / 2
 						}
 
 					}
@@ -288,7 +306,7 @@ func (mc *MovotoCrawler) ParseData(source string) error {
 					if exterior.Name == "Parking" {
 						for _, parking := range exterior.Value {
 							if parking.Name == "# Covered Spaces" {
-								mc.CrawlerSchemas.MovotoData.TotalParkingSpaces = parking.Value
+								mc.CrawlerTables.MovotoData.TotalParkingSpaces = parking.Value
 							}
 						}
 					}
@@ -296,8 +314,8 @@ func (mc *MovotoCrawler) ParseData(source string) error {
 			}
 		}
 	}
-	mc.CrawlerSchemas.MovotoData.SF = float64(movotoJsonRes.PageData.SqftTotal)
-	mc.CrawlerSchemas.MovotoData.SalesPrice = float64(movotoJsonRes.PageData.ListPrice)
+	mc.CrawlerTables.MovotoData.SF = float64(movotoJsonRes.PageData.SqftTotal)
+	mc.CrawlerTables.MovotoData.SalesPrice = float64(movotoJsonRes.PageData.ListPrice)
 
 	var pictures []string
 	if len(movotoJsonRes.PageData.CategorizedPhotos) > 0 {
@@ -309,8 +327,8 @@ func (mc *MovotoCrawler) ParseData(source string) error {
 			}
 		}
 	}
-	mc.CrawlerSchemas.MovotoData.Pictures = pictures
-	mc.CrawlerSchemas.MovotoData.Overview = movotoJsonRes.PageData.Description
+	mc.CrawlerTables.MovotoData.Pictures = strings.Join(pictures, ", ")
+	mc.CrawlerTables.MovotoData.Overview = movotoJsonRes.PageData.Description
 	//mc.ParseFullBathrooms()
 	//mc.ParseSF()
 	//mc.ParseSalePrice()
@@ -355,7 +373,7 @@ func (mc *MovotoCrawler) ParseEstPayment() {
 		mc.Logger.Warn("Parse Est Payment: Not found element.")
 		return
 	}
-	mc.CrawlerSchemas.MovotoData.EstPayment = htmlquery.InnerText(estPaymentDoc)
+	mc.CrawlerTables.MovotoData.EstPayment = htmlquery.InnerText(estPaymentDoc)
 }
 
 // ParsePrincipalInterest for parsing Principal Interest
@@ -368,7 +386,7 @@ func (mc *MovotoCrawler) ParsePrincipalInterest() {
 		return
 	}
 
-	mc.CrawlerSchemas.MovotoData.PrincipalInterest = htmlquery.InnerText(principalInterestDoc)
+	mc.CrawlerTables.MovotoData.PrincipalInterest = htmlquery.InnerText(principalInterestDoc)
 }
 
 // ParseMortgageInsurance for parsing Mortgage Insurance
@@ -378,7 +396,7 @@ func (mc *MovotoCrawler) ParseMortgageInsurance() {
 		mc.Logger.Warn("Parse Mortgage Insurance: Not found element.")
 		return
 	}
-	mc.CrawlerSchemas.MovotoData.MortgageInsurance = htmlquery.InnerText(mortgageInsuranceDoc)
+	mc.CrawlerTables.MovotoData.MortgageInsurance = htmlquery.InnerText(mortgageInsuranceDoc)
 }
 
 // ParsePropertyTaxes for parsing Property Taxes
@@ -388,7 +406,7 @@ func (mc *MovotoCrawler) ParsePropertyTaxes() {
 		mc.Logger.Warn("Parse Property Taxes: Not found element.")
 		return
 	}
-	mc.CrawlerSchemas.MovotoData.PropertyTaxes = htmlquery.InnerText(propertyTaxesDoc)
+	mc.CrawlerTables.MovotoData.PropertyTaxes = htmlquery.InnerText(propertyTaxesDoc)
 }
 
 // ParseHomeInsurance for parsing Home Insurance
@@ -399,7 +417,7 @@ func (mc *MovotoCrawler) ParseHomeInsurance() {
 		mc.Logger.Warn("Parse Home Insurance: Not found element.")
 		return
 	}
-	mc.CrawlerSchemas.MovotoData.HomeInsurance = htmlquery.InnerText(homeInsuranceDoc)
+	mc.CrawlerTables.MovotoData.HomeInsurance = htmlquery.InnerText(homeInsuranceDoc)
 }
 
 // ParseEstimatedSalesRange for parsing Estimated Sale Range Minimum and Maximum
@@ -412,8 +430,8 @@ func (mc *MovotoCrawler) ParseEstimatedSalesRange() {
 	estSaleRangeText := htmlquery.InnerText(estSaleRangeDoc)
 	estSaleRange := strings.Split(estSaleRangeText, "-")
 	if len(estSaleRange) == 2 {
-		mc.CrawlerSchemas.MovotoData.EstimatedSalesRangeMinimum = strings.TrimSpace(estSaleRange[0])
-		mc.CrawlerSchemas.MovotoData.EstimatedSalesRangeMax = strings.TrimSpace(estSaleRange[1])
+		mc.CrawlerTables.MovotoData.EstimatedSalesRangeMinimum = strings.TrimSpace(estSaleRange[0])
+		mc.CrawlerTables.MovotoData.EstimatedSalesRangeMax = strings.TrimSpace(estSaleRange[1])
 	}
 }
 
@@ -424,7 +442,7 @@ func (mc *MovotoCrawler) ParseMLS() {
 		mc.Logger.Warn("Parse #MLS: Not found element.")
 		return
 	}
-	mc.CrawlerSchemas.MovotoData.MLS = htmlquery.InnerText(mlsDoc)
+	mc.CrawlerTables.MovotoData.MLS = htmlquery.InnerText(mlsDoc)
 }
 
 // ParseYearBuilt for parsing Year Built
@@ -434,7 +452,7 @@ func (mc *MovotoCrawler) ParseYearBuilt() {
 		mc.Logger.Warn("Parse Year Built: Not found element.")
 		return
 	}
-	mc.CrawlerSchemas.MovotoData.YearBuilt = htmlquery.InnerText(yearBuiltDoc)
+	mc.CrawlerTables.MovotoData.YearBuilt = htmlquery.InnerText(yearBuiltDoc)
 }
 
 // ParseLotSizeAcres for parsing Lot Size Acres
@@ -444,7 +462,7 @@ func (mc *MovotoCrawler) ParseLotSizeAcres() {
 		mc.Logger.Warn("Parse Lot Size Acres: Not found element.")
 		return
 	}
-	mc.CrawlerSchemas.MovotoData.LotSizeAcres = strings.TrimSpace(strings.Replace(htmlquery.InnerText(lotSizeAcresDoc), "Lot Size Acres:", "", -1))
+	mc.CrawlerTables.MovotoData.LotSizeAcres = strings.TrimSpace(strings.Replace(htmlquery.InnerText(lotSizeAcresDoc), "Lot Size Acres:", "", -1))
 }
 
 // ParseAppliances for parsing Appliances
@@ -454,7 +472,7 @@ func (mc *MovotoCrawler) ParseAppliances() {
 		mc.Logger.Warn("Parse Appliances: Not found element.")
 		return
 	}
-	mc.CrawlerSchemas.MovotoData.Appliances = htmlquery.InnerText(appliancesDoc)
+	mc.CrawlerTables.MovotoData.Appliances = htmlquery.InnerText(appliancesDoc)
 }
 
 // ParsePropertySubtype for parsing Property Subtype
@@ -464,7 +482,7 @@ func (mc *MovotoCrawler) ParsePropertySubtype() {
 		mc.Logger.Warn("Parse Property Subtype: Not found element.")
 		return
 	}
-	mc.CrawlerSchemas.MovotoData.ProperySubType = htmlquery.InnerText(propertySubTypesDoc)
+	mc.CrawlerTables.MovotoData.ProperySubType = htmlquery.InnerText(propertySubTypesDoc)
 }
 
 // ParseFoundation for parsing Foundation
@@ -474,7 +492,7 @@ func (mc *MovotoCrawler) ParseFoundation() {
 		mc.Logger.Warn("Parse Foundation: Not found element.")
 		return
 	}
-	mc.CrawlerSchemas.MovotoData.Foundation = htmlquery.InnerText(foundationDoc)
+	mc.CrawlerTables.MovotoData.Foundation = htmlquery.InnerText(foundationDoc)
 }
 
 // ParseNewConstruction for parsing New Construction
@@ -484,5 +502,5 @@ func (mc *MovotoCrawler) ParseNewConstruction() {
 		mc.Logger.Warn("Parse New Construction: Not found element.")
 		return
 	}
-	mc.CrawlerSchemas.MovotoData.NewConstruction = htmlquery.InnerText(newConstructionDoc)
+	mc.CrawlerTables.MovotoData.NewConstruction = htmlquery.InnerText(newConstructionDoc)
 }

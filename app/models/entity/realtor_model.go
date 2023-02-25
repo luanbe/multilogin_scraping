@@ -8,7 +8,7 @@ import (
 )
 
 // TODO: Use swagger later
-type Zillow struct {
+type Realtor struct {
 	base.BaseIDModel
 	// Add pointer to foreign key to set null
 	//Maindb3ID                  uint64    `gorm:"column:maindb3_id; unique" json:"maindb3_id"`
@@ -96,35 +96,12 @@ type Zillow struct {
 	CrawlingStatus             string    `gorm:"type:varchar(50)" json:"crawling_status"`
 }
 
-type Tabler interface {
-	TableName() string
-}
-
-type ZillowPriceHistory struct {
-	base.BaseIDModel
-	Maindb3ID uint64 `gorm:"column:maindb3_id" json:"maindb3_id"`
-	Address   string `gorm:"type:text" json:"address"`
-	Date      string `gorm:"type:varchar(100)" json:"date"`
-	Event     string `gorm:"type:varchar(100)" json:"event"`
-	Price     string `gorm:"type:varchar(100)" json:"price"`
-	Source    string `gorm:"type:varchar(100)" json:"source"`
-}
-
-type ZillowPublicTaxHistory struct {
-	base.BaseIDModel
-	Maindb3ID     uint64 `gorm:"column:maindb3_id" json:"maindb3_id"`
-	Address       string `gorm:"type:text" json:"address"`
-	Year          string `gorm:"type:varchar(50)" json:"date"`
-	PropertyTaxes string `gorm:"type:varchar(100)" json:"property_taxes"`
-	TaxAssessment string `gorm:"type:varchar(100)" json:"tax_assessment"`
-}
-
 // TableName overrides
-func (Zillow) TableName() string {
-	return "zillow"
+func (Realtor) TableName() string {
+	return "realtor"
 }
 
-func (base *Zillow) BeforeCreate(tx *gorm.DB) error {
+func (base *Realtor) BeforeCreate(tx *gorm.DB) error {
 	tx.Statement.SetColumn("TimestampForDataExtraction", time.Now().In(util.Loc))
 	return nil
 }
