@@ -22,7 +22,7 @@ func init() {
 	}
 }
 
-func main() {
+func main56() {
 	// Init Logger
 	logger := initialization.InitLogger(
 		map[string]interface{}{"Logger": "System"},

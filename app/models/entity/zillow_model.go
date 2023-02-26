@@ -121,7 +121,7 @@ type ZillowPublicTaxHistory struct {
 
 // TableName overrides
 func (Zillow) TableName() string {
-	return "zillow"
+	return "phpfox_dat9_locations_detail"
 }
 
 func (base *Zillow) BeforeCreate(tx *gorm.DB) error {

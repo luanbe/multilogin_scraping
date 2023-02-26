@@ -22,7 +22,7 @@ func init() {
 	}
 }
 
-func main() {
+func main55() {
 	// Init logger
 	workerLog := initialization.InitLogger(
 		map[string]interface{}{"Logger": "Crawling Address"},
